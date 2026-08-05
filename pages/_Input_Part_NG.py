@@ -188,7 +188,7 @@ mp_list = list(MP_DATA.keys())
 machine_list = list(MACHINE_DATA.keys())
 
 st.markdown("<h1 class='main-title'>🔴 Input Dual Master NG</h1>", unsafe_allow_html=True)
-st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto label, lalu klik Input.")
+st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto name plate, lalu klik Input.")
 st.markdown("---")
 
 # State OCR
@@ -196,7 +196,7 @@ if "extracted_type" not in st.session_state: st.session_state["extracted_type"] 
 if "extracted_sn" not in st.session_state: st.session_state["extracted_sn"] = ""
 
 # Upload Foto
-uploaded_file = st.file_uploader("📷 Upload Foto Label Dual Master (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Dual Master (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
 encoded_img = ""
 
 if uploaded_file is not None:
@@ -208,25 +208,56 @@ if uploaded_file is not None:
     encoded_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
     
     if HAS_OCR:
-        with st.spinner("🔍 Memindai teks pada foto..."):
+        with st.spinner("🔍 Memindai teks pada name plate..."):
             try:
                 image_np = np.array(image)
                 results = reader.readtext(image_np, detail=0)
                 
-                detected_type = "Standard"
-                detected_sn = "-"
+                detected_type = ""
+                detected_sn = ""
                 
                 for i, text in enumerate(results):
                     t_upper = text.upper()
-                    if "TYPE" in t_upper or "TIP" in t_upper:
-                        if i + 1 < len(results):
-                            detected_type = results[i+1].upper()
-                    if any(char.isdigit() for char in text) and len(text) >= 5:
-                        detected_sn = text.strip()
+                    
+                    # Abaikan teks label repair atas
+                    if "REPAIR" in t_upper or "MAR" in t_upper or "OK" in t_upper:
+                        continue
+                    
+                    # Cari teks TYPE
+                    if "TYPE" in t_upper:
+                        if ":" in t_upper:
+                            parts = t_upper.split(":")
+                            if len(parts) > 1 and parts[1].strip():
+                                detected_type = parts[1].strip()
+                        elif i + 1 < len(results):
+                            detected_type = results[i+1].strip()
+                    
+                    # Cari teks SERIAL No.
+                    if "SERIAL" in t_upper or "SER" in t_upper:
+                        if ":" in t_upper:
+                            parts = t_upper.split(":")
+                            if len(parts) > 1 and parts[1].strip():
+                                detected_sn = parts[1].strip()
+                        elif i + 1 < len(results):
+                            detected_sn = results[i+1].strip()
 
-                st.session_state["extracted_type"] = detected_type
-                st.session_state["extracted_sn"] = detected_sn
-                st.success("✅ Berhasil memindai teks label!")
+                # Fallback otomatis jika label spesifik meleset
+                if not detected_type:
+                    for text in results:
+                        if "DME" in text.upper():
+                            detected_type = text.strip()
+                            break
+                            
+                if not detected_sn:
+                    for text in results:
+                        t_clean = text.strip()
+                        if any(char.isdigit() for char in t_clean) and len(t_clean) >= 6 and not any(w in t_clean.upper() for w in ["2026", "AC", "DC", "V", "HZ"]):
+                            detected_sn = t_clean
+                            break
+
+                st.session_state["extracted_type"] = detected_type if detected_type else "DME-010"
+                st.session_state["extracted_sn"] = detected_sn if detected_sn else "-"
+                st.success("✅ Berhasil memindai Name Plate!")
             except Exception as ocr_err:
                 st.warning(f"Catatan OCR: Gagal membaca otomatis ({ocr_err}), silakan ketik manual.")
 
@@ -240,9 +271,10 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
-        nama_sparepart = st.text_input("Nama Sparepart", value="Dual Master", disabled=True)
-        type_part = st.text_input("Type Part / Model", value=st.session_state["extracted_type"])
-        nomor_seri = st.text_input("Nomor Seri (Serial No.)", value=st.session_state["extracted_sn"])
+        # Nama kolom disesuaikan persis dengan baris teratas name plate
+        nama_sparepart = st.text_input("Dual Master", value="Dual Master Expander Device", disabled=True)
+        type_part = st.text_input("TYPE", value=st.session_state["extracted_type"])
+        nomor_seri = st.text_input("SERIAL No.", value=st.session_state["extracted_sn"])
         qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
 
     submitted = st.form_submit_button("🚨 Input")
@@ -259,8 +291,8 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
                 "shift": detected_shift,
                 "line": detected_line,
                 "mesin": mesin_pilih,
-                "nama_part": "Dual Master",
-                "type_part": type_part if type_part else "Standard",
+                "nama_part": "Dual Master Expander Device",
+                "type_part": type_part if type_part else "DME-010",
                 "no_seri": nomor_seri if nomor_seri else "-",
                 "qty": int(qty_part),
                 "teknisi": nama_mp,
