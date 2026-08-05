@@ -6,7 +6,6 @@ import base64
 import numpy as np
 import requests
 
-# Coba import EasyOCR untuk scan foto name plate
 try:
     import easyocr
     @st.cache_resource
@@ -19,11 +18,7 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
 
-# --- URL WEB APP GOOGLE APPS SCRIPT UNTUK NG ---
-# (Pastikan Anda menggunakan URL Web App yang terhubung ke sheet/tab NG, 
-# atau jika jadi satu spreadsheet, Anda bisa buat script Apps Script baru untuk tab NG, 
-# lalu masukkan URL-nya di sini)
-SHEETS_URL = "URL_WEB_APP_UNTUK_PART_NG_ANDA"
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbwrO2IRNPLSzPbb9OBRS3cwRm_0_bXDGEC3KnkStQveUMiPWPnhcZAEMA3sZyVOx9iX/exec"
 
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
@@ -43,17 +38,10 @@ st.markdown("---")
 if "ng_type" not in st.session_state: st.session_state["ng_type"] = ""
 if "ng_sn" not in st.session_state: st.session_state["ng_sn"] = ""
 
-# Fitur Upload Foto & OCR untuk deteksi otomatis
 uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part NG", type=["png", "jpg", "jpeg"])
-encoded_img = ""
-
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, width=250)
-    buffered = io.BytesIO()
-    image.save(buffered, format="JPEG")
-    encoded_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
     if HAS_OCR:
         with st.spinner("🔍 Memindai teks..."):
             try:
@@ -106,10 +94,9 @@ with st.form("form_ng", clear_on_submit=True):
                 "status": status_aksi
             }
             
-            # Kirim data langsung ke Google Spreadsheet khusus NG
             try:
-                response = requests.post(SHEETS_URL, json=payload)
-                st.success("Input Part NG Berhasil Disimpan!")
+                requests.post(SHEETS_URL, json=payload)
+                st.success("Input Berhasil")
             except Exception as err:
                 st.warning(f"Gagal koneksi ke Sheets: {err}")
                 
