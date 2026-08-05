@@ -1,31 +1,51 @@
 import streamlit as st
-import pandas as pd
+import datetime
+import requests
 from supabase import create_client
 
-st.set_page_config(page_title="Data Part Repair", page_icon="🛠️", layout="wide")
+st.set_page_config(page_title="Input Part Repair", page_icon="🛠️", layout="wide")
 
-@st.cache_resource
-def init_supabase():
-    url = st.secrets.get("SUPABASE_URL", "")
-    key = st.secrets.get("SUPABASE_KEY", "")
-    if not url or not key: return None
-    return create_client(url, key)
+supabase = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+SHEETS_URL = "URL_WEB_APP_SPREADSHEET_ANDA"
 
-supabase = init_supabase()
+MP_DATA = {"Ammar": "Red", "Agus M": "Red", "Irul K": "White"}
 
-st.markdown("# 🛠️ Halaman Data Part Repair")
+st.markdown("# 🛠️ Halaman Proses & Perbaikan Part (Repair)")
 st.markdown("---")
 
-if supabase:
-    try:
-        response = supabase.table("maintenance_log").select("*").eq("status_part", "Part NG").execute()
-        data_repair = response.data
-        if data_repair:
-            df_repair = pd.DataFrame(data_repair)
-            st.dataframe(df_repair, use_container_width=True)
+with st.form("form_repair", clear_on_submit=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        tanggal = st.date_input("Tanggal", value=datetime.date.today())
+        teknisi = st.selectbox("Teknisi", ["-- Pilih --"] + list(MP_DATA.keys()))
+        no_seri = st.text_input("Scan/Ketik SERIAL No. Part")
+    with col2:
+        nama_part = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
+        type_part = st.text_input("TYPE", value="DME-010")
+        qty = st.number_input("QTY", min_value=1, value=1)
+        
+        # Pilihan status aksi repair
+        status_aksi = st.radio("Status Pengerjaan:", ["On Progress Repair", "Done Repair (OK)"])
+
+    submitted = st.form_submit_button("💾 Proses Data Repair")
+    if submitted:
+        if teknisi == "-- Pilih --" or not no_seri:
+            st.error("Teknisi dan Serial No wajib diisi!")
         else:
-            st.info("Belum ada data part yang masuk dalam daftar perbaikan.")
-    except Exception as e:
-        st.error(f"Gagal mengambil data: {e}")
-else:
-    st.warning("Database belum terhubung. Periksa secrets Supabase Anda.")
+            shift = MP_DATA.get(teknisi, "General")
+            
+            if "On Progress" in status_aksi:
+                action_type = "Repair"
+                status_val = "On Progress"
+            else:
+                action_type = "OK"
+                status_val = "Done Repair / OK"
+
+            payload = {
+                "action": action_type, "tanggal": str(tanggal), "nama": teknisi, "shift": shift,
+                "line": "-", "mesin": "-", "nama_part": nama_part, "type_part": type_part,
+                "no_seri": no_seri, "qty": qty, "status": status_val
+            }
+            supabase.table("maintenance_log").insert(payload).execute()
+            requests.post(SHEETS_URL, json=payload)
+            st.success(f"✅ Data berhasil dicatat dengan status: {status_val}!")
