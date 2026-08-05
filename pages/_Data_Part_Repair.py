@@ -18,7 +18,7 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part Repair", page_icon="🛠️", layout="wide")
 
-SHEETS_URL = "https://script.google.com/macros/s/AKfycbwrO2IRNPLSzPbb9OBRS3cwRm_0_bXDGEC3KnkStQveUMiPWPnhcZAEMA3sZyVOx9iX/exec"
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
 
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
@@ -80,7 +80,6 @@ with st.form("form_repair", clear_on_submit=True):
         else:
             shift = MP_DATA.get(teknisi, "General")
             
-            # Jika Done Repair, arahkan action ke "OK" agar otomatis pindah ke tab OK
             if "On Progress" in status_aksi:
                 action_type = "Repair"
                 status_val = "On Progress"
