@@ -18,7 +18,7 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
 
-SHEETS_URL = "https://script.google.com/macros/s/AKfycbwrO2IRNPLSzPbb9OBRS3cwRm_0_bXDGEC3KnkStQveUMiPWPnhcZAEMA3sZyVOx9iX/exec"
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
 
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
@@ -66,6 +66,8 @@ with st.form("form_ng", clear_on_submit=True):
     with col1:
         tanggal = st.date_input("Tanggal Temuan", value=datetime.date.today())
         teknisi = st.selectbox("Nama Teknisi / MP", ["-- Pilih --"] + mp_list)
+        line = st.text_input("Line", value="Line 1")
+        mesin = st.text_input("Mesin", value="Machine A")
         status_aksi = st.radio("Status NG:", ["Pending Analisa", "Scrap / Reject"])
     with col2:
         nama_part = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
@@ -85,8 +87,8 @@ with st.form("form_ng", clear_on_submit=True):
                 "tanggal": str(tanggal), 
                 "nama": teknisi, 
                 "shift": shift,
-                "line": "-", 
-                "mesin": "-", 
+                "line": line, 
+                "mesin": mesin, 
                 "nama_part": nama_part, 
                 "type_part": type_part if type_part else "DME-010",
                 "no_seri": no_seri if no_seri else "2CB0421 A", 
