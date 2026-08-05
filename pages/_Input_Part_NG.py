@@ -4,6 +4,7 @@ from datetime import datetime
 from PIL import Image
 import io
 import base64
+import numpy as np
 from supabase import create_client
 
 # Coba import EasyOCR untuk scan foto
@@ -67,7 +68,7 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- DATA MASTER LENGKAP (DIJAMIN MUNCUL TANPA GAGAL EXCEL) ---
+# --- DATA MASTER LENGKAP ---
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -209,14 +210,17 @@ if uploaded_file is not None:
     
     if HAS_OCR:
         with st.spinner("🔍 Memindai teks pada foto..."):
-            image_np = io.BytesIO(buffered.getvalue())
-            result = reader.readtext(image_np, detail=0)
-            scanned_text = " ".join(result)
-            
-            st.session_state["extracted_nama"] = scanned_text[:30].upper()
-            st.session_state["extracted_type"] = "TYPE-" + "".join(filter(str.isalnum, scanned_text[:6])).upper()
-            st.session_state["extracted_sn"] = "SN-" + "".join(filter(str.isdigit, scanned_text))[:8]
-            st.success("✅ Berhasil memindai teks dari foto!")
+            try:
+                image_np = np.array(image)
+                result = reader.readtext(image_np, detail=0)
+                scanned_text = " ".join(result)
+                
+                st.session_state["extracted_nama"] = scanned_text[:30].upper()
+                st.session_state["extracted_type"] = "TYPE-" + "".join(filter(str.isalnum, scanned_text[:6])).upper()
+                st.session_state["extracted_sn"] = "SN-" + "".join(filter(str.isdigit, scanned_text))[:8]
+                st.success("✅ Berhasil memindai teks dari foto!")
+            except Exception as ocr_err:
+                st.warning(f"Catatan OCR: Gagal membaca teks otomatis ({ocr_err}), silakan ketik manual.")
 
 # Form Input
 with st.form("form_input_ng_clean", clear_on_submit=True):
@@ -224,11 +228,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
     
     with col1:
         tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
-        
-        # Nama MP (Seluruh nama lengkap dijamin muncul)
         nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
-        
-        # Pilihan Mesin (Seluruh mesin lengkap muncul dengan fitur search/ketik)
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
@@ -237,17 +237,13 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
         nomor_seri = st.text_input("Nomor Seri (Serial No.)", value=st.session_state["extracted_sn"])
         qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
 
-    # Tombol submit dengan tulisan "Input"
     submitted = st.form_submit_button("🚨 Input")
     
     if submitted:
         if nama_mp == "-- Pilih Nama MP --" or mesin_pilih == "-- Pilih Mesin --":
             st.error("Nama MP dan Mesin wajib dipilih!")
         else:
-            # Shift otomatis terekam di belakang layar
             detected_shift = MP_DATA.get(nama_mp, "General")
-            
-            # Line dan Mesin terhubung otomatis di belakang layar
             detected_line = MACHINE_DATA.get(mesin_pilih, "General Line")
             
             payload = {
