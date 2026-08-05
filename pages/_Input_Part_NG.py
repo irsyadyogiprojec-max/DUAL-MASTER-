@@ -67,25 +67,25 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- LOAD SEMUA MASTER DATA DARI EXCEL SECARA LENGKAP ---
+# --- LOAD MASTER DATA SECARA TERPISAH DAN UTUH DARI EXCEL ---
 @st.cache_data
 def load_master_data():
     try:
         df = pd.read_excel("Data Terbaru Dual Master.xlsx", sheet_name="Sheet1")
         
-        # Ambil semua data PIC dan Shift secara utuh
+        # 1. Ambil data MP & Shift secara independen agar tidak terpotong
         df_mp = df[['Shift', 'PIC']].dropna(subset=['PIC']).copy()
         mp_list = df_mp['PIC'].astype(str).tolist()
         mp_shift_map = dict(zip(df_mp['PIC'].astype(str), df_mp['Shift'].fillna('General').astype(str)))
         
-        # Ambil semua data Machine dan Line secara utuh
+        # 2. Ambil data Machine & Line secara independen (semua 300 baris)
         df_machine = df[['Line', 'Machine']].dropna(subset=['Machine']).copy()
         machine_list = df_machine['Machine'].astype(str).tolist()
         machine_line_map = dict(zip(df_machine['Machine'].astype(str), df_machine['Line'].astype(str)))
         
         return mp_list, mp_shift_map, machine_list, machine_line_map
     except Exception as e:
-        return ["Ammar", "Agus M"], {}, ["IDR 052"], {"IDR 052": "Cylinder Block"}
+        return ["Ammar", "Agus M", "Irul K", "Asep"], {}, ["IDR 052", "Gondola"], {}
 
 mp_list, mp_shift_map, machine_list, machine_line_map = load_master_data()
 
@@ -128,10 +128,10 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
     with col1:
         tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
         
-        # Nama MP (Semua nama muncul lengkap)
+        # Nama MP (Seluruh nama dari Excel kini muncul lengkap)
         nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
         
-        # Pilihan Mesin (Bisa diketik untuk mencari dengan cepat, line terdeteksi otomatis di backend)
+        # Pilihan Mesin (Seluruh 300 mesin dari Excel muncul, bisa diketik untuk cari)
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
@@ -147,8 +147,10 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
         if nama_mp == "-- Pilih Nama MP --" or mesin_pilih == "-- Pilih Mesin --":
             st.error("Nama MP dan Mesin wajib dipilih!")
         else:
-            # Shift dan Line otomatis terambil di backend tanpa ditampilkan di layar
+            # Shift otomatis terekam di database/Excel (tidak tampil di layar web)
             detected_shift = mp_shift_map.get(nama_mp, "General")
+            
+            # Line dan Mesin terhubung secara otomatis di database/Excel
             detected_line = machine_line_map.get(mesin_pilih, "General Line")
             
             payload = {
