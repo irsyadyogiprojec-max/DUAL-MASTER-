@@ -210,10 +210,8 @@ if uploaded_file is not None:
     if HAS_OCR:
         with st.spinner("🔍 Memindai teks pada name plate..."):
             try:
-                # Rotasi otomatis 270 derajat agar pembacaan OCR teks vertikal akurat
-                image_rotated = image.rotate(270, expand=True)
-                image_np = np.array(image_rotated)
-                
+                # Tanpa rotasi, langsung scan gambar asli
+                image_np = np.array(image)
                 results = reader.readtext(image_np, detail=0)
                 
                 detected_type = ""
@@ -236,7 +234,7 @@ if uploaded_file is not None:
                             detected_type = results[i+1].strip()
                     
                     # Cari teks SERIAL No.
-                    if "SERIAL" in t_upper or "SER" in t_upper or "NO" in t_upper:
+                    if "SERIAL" in t_upper or "SER" in t_upper:
                         if ":" in t_upper:
                             parts = t_upper.split(":")
                             if len(parts) > 1 and len(parts[1].strip()) > 3:
@@ -246,7 +244,7 @@ if uploaded_file is not None:
                             if len(candidate) >= 4 and "REPAIR" not in candidate.upper():
                                 detected_sn = candidate
 
-                # Fallback otomatis jika label spesifik meleset
+                # Fallback otomatis langsung cari format serial 2CB
                 if not detected_type:
                     for text in results:
                         if "DME" in text.upper():
@@ -257,7 +255,7 @@ if uploaded_file is not None:
                     for text in results:
                         t_clean = text.strip()
                         t_up = t_clean.upper()
-                        if "2CB" in t_up or ("2" in t_up and len(t_clean) >= 8 and "2026" not in t_up):
+                        if "2CB" in t_up or ("2" in t_up and len(t_clean) >= 7 and "2026" not in t_up):
                             detected_sn = t_clean
                             break
 
