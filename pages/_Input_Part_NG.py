@@ -5,6 +5,7 @@ from PIL import Image
 import io
 import base64
 import numpy as np
+import requests
 from supabase import create_client
 
 # Coba import EasyOCR untuk scan foto
@@ -18,26 +19,23 @@ try:
 except ImportError:
     HAS_OCR = False
 
-# Konfigurasi Halaman & Sembunyikan Sidebar Bawaan
+# Konfigurasi Halaman & Layout
 st.set_page_config(
-    page_title="Input Dual Master NG",
-    page_icon="🔴",
+    page_title="Sistem Rekap Part Maintenance",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # CSS Styling Tampilan Bersih & Terisolasi
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
     .stApp {
         background: linear-gradient(135deg, #0B0F19 0%, #111827 50%, #0F172A 100%);
         color: #F3F4F6;
     }
     .main-title {
-        color: #EF4444;
+        color: #38BDF8;
         font-weight: 800;
     }
     div[data-testid="stForm"] {
@@ -47,8 +45,6 @@ st.markdown("""
         padding: 25px !important;
     }
     .stButton>button {
-        background: linear-gradient(90deg, #DC2626 0%, #991B1B 100%) !important;
-        color: #FFFFFF !important;
         border-radius: 10px !important;
         width: 100% !important;
         font-weight: bold;
@@ -67,6 +63,7 @@ def init_supabase():
     return create_client(url, key)
 
 supabase = init_supabase()
+GOOGLE_SHEETS_URL = "https://script.google.com/macros/s/AKfycbwcwsvm7SwocuXzjyMBdWyTCllWT7wi5hMRMm3fxo-64Q_EcgXqRaWfMXeC0O6rxkbT/exec"
 
 # --- DATA MASTER LENGKAP ---
 MP_DATA = {
@@ -187,130 +184,246 @@ MACHINE_DATA = {
 mp_list = list(MP_DATA.keys())
 machine_list = list(MACHINE_DATA.keys())
 
-st.markdown("<h1 class='main-title'>🔴 Input Dual Master NG</h1>", unsafe_allow_html=True)
-st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto name plate, lalu klik Input.")
-st.markdown("---")
+# --- SIDEBAR NAVIGASI UTAMA ---
+st.sidebar.title("📌 Menu Navigasi")
+menu = st.sidebar.radio("Pilih Halaman:", ["🔴 Input Part NG", "🛠️ Data Part Repair", "🟢 Input Part OK"])
 
-# State OCR
-if "extracted_type" not in st.session_state: st.session_state["extracted_type"] = ""
-if "extracted_sn" not in st.session_state: st.session_state["extracted_sn"] = ""
+# ==========================================
+# HALAMAN 1: INPUT PART NG
+# ==========================================
+if menu == "🔴 Input Part NG":
+    st.markdown("<h1 class='main-title'>🔴 Input Data Part NG (Dual Master)</h1>", unsafe_allow_html=True)
+    st.caption("Scan OCR name plate, lengkapi data, lalu simpan ke Database & Google Spreadsheet.")
+    st.markdown("---")
 
-# Upload Foto
-uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Dual Master (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
-encoded_img = ""
+    if "extracted_type" not in st.session_state: st.session_state["extracted_type"] = ""
+    if "extracted_sn" not in st.session_state: st.session_state["extracted_sn"] = ""
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, width=250, caption="Foto Dual Master NG")
-    
-    buffered = io.BytesIO()
-    image.save(buffered, format="JPEG")
-    encoded_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
-    if HAS_OCR:
-        with st.spinner("🔍 Memindai teks pada name plate..."):
-            try:
-                # Tanpa rotasi, langsung scan gambar asli
-                image_np = np.array(image)
-                results = reader.readtext(image_np, detail=0)
-                
-                detected_type = ""
-                detected_sn = ""
-                
-                for i, text in enumerate(results):
-                    t_upper = text.upper()
-                    
-                    # Abaikan teks label repair atas
-                    if "REPAIR" in t_upper or "MAR" in t_upper or "OK" in t_upper:
-                        continue
-                    
-                    # Cari teks TYPE
-                    if "TYPE" in t_upper:
-                        if ":" in t_upper:
-                            parts = t_upper.split(":")
-                            if len(parts) > 1 and parts[1].strip():
-                                detected_type = parts[1].strip()
-                        elif i + 1 < len(results):
-                            detected_type = results[i+1].strip()
-                    
-                    # Cari teks SERIAL No.
-                    if "SERIAL" in t_upper or "SER" in t_upper:
-                        if ":" in t_upper:
-                            parts = t_upper.split(":")
-                            if len(parts) > 1 and len(parts[1].strip()) > 3:
-                                detected_sn = parts[1].strip()
-                        elif i + 1 < len(results):
-                            candidate = results[i+1].strip()
-                            if len(candidate) >= 4 and "REPAIR" not in candidate.upper():
-                                detected_sn = candidate
+    uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Dual Master", type=["png", "jpg", "jpeg"])
+    encoded_img = ""
 
-                # Fallback otomatis langsung cari format serial 2CB
-                if not detected_type:
-                    for text in results:
-                        if "DME" in text.upper():
-                            detected_type = text.strip()
-                            break
-                            
-                if not detected_sn:
-                    for text in results:
-                        t_clean = text.strip()
-                        t_up = t_clean.upper()
-                        if "2CB" in t_up or ("2" in t_up and len(t_clean) >= 7 and "2026" not in t_up):
-                            detected_sn = t_clean
-                            break
-
-                st.session_state["extracted_type"] = detected_type if detected_type else "DME-010"
-                st.session_state["extracted_sn"] = detected_sn if detected_sn else "2CB0421 A"
-                st.success("✅ Berhasil memindai Name Plate!")
-            except Exception as ocr_err:
-                st.warning(f"Catatan OCR: Gagal membaca otomatis ({ocr_err}), silakan ketik manual.")
-
-# Form Input
-with st.form("form_input_ng_clean", clear_on_submit=True):
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
-        nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
-        mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
-
-    with col2:
-        # Nama kolom disesuaikan persis dengan baris name plate atas & bawah
-        nama_sparepart = st.text_input("Dual Master", value="Dual Master Expander Device", disabled=True)
-        type_part = st.text_input("TYPE", value=st.session_state["extracted_type"])
-        nomor_seri = st.text_input("SERIAL No.", value=st.session_state["extracted_sn"])
-        qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
-
-    submitted = st.form_submit_button("🚨 Input")
-    
-    if submitted:
-        if nama_mp == "-- Pilih Nama MP --" or mesin_pilih == "-- Pilih Mesin --":
-            st.error("Nama MP dan Mesin wajib dipilih!")
-        else:
-            detected_shift = MP_DATA.get(nama_mp, "General")
-            detected_line = MACHINE_DATA.get(mesin_pilih, "General Line")
-            
-            payload = {
-                "tanggal": str(tanggal_input),
-                "shift": detected_shift,
-                "line": detected_line,
-                "mesin": mesin_pilih,
-                "nama_part": "Dual Master Expander Device",
-                "type_part": type_part if type_part else "DME-010",
-                "no_seri": nomor_seri if nomor_seri else "2CB0421 A",
-                "qty": int(qty_part),
-                "teknisi": nama_mp,
-                "status_part": "Part NG",
-                "foto_base64": encoded_img
-            }
-            
-            if supabase:
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, width=250, caption="Foto Dual Master NG")
+        
+        buffered = io.BytesIO()
+        image.save(buffered, format="JPEG")
+        encoded_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        
+        if HAS_OCR:
+            with st.spinner("🔍 Memindai teks pada name plate..."):
                 try:
-                    supabase.table("maintenance_log").insert(payload).execute()
-                    st.success("🎉 Data Dual Master NG berhasil di-input!")
+                    image_np = np.array(image)
+                    results = reader.readtext(image_np, detail=0)
+                    
+                    detected_type = ""
+                    detected_sn = ""
+                    
+                    for i, text in enumerate(results):
+                        t_upper = text.upper()
+                        if "REPAIR" in t_upper or "MAR" in t_upper or "OK" in t_upper:
+                            continue
+                        if "TYPE" in t_upper:
+                            if ":" in t_upper:
+                                parts = t_upper.split(":")
+                                if len(parts) > 1 and parts[1].strip():
+                                    detected_type = parts[1].strip()
+                            elif i + 1 < len(results):
+                                detected_type = results[i+1].strip()
+                        
+                        if "SERIAL" in t_upper or "SER" in t_upper:
+                            if ":" in t_upper:
+                                parts = t_upper.split(":")
+                                if len(parts) > 1 and len(parts[1].strip()) > 3:
+                                    detected_sn = parts[1].strip()
+                            elif i + 1 < len(results):
+                                candidate = results[i+1].strip()
+                                if len(candidate) >= 4 and "REPAIR" not in candidate.upper():
+                                    detected_sn = candidate
+
+                    if not detected_type:
+                        for text in results:
+                            if "DME" in text.upper():
+                                detected_type = text.strip()
+                                break
+                                
+                    if not detected_sn:
+                        for text in results:
+                            t_clean = text.strip()
+                            t_up = t_clean.upper()
+                            if "2CB" in t_up or ("2" in t_up and len(t_clean) >= 7 and "2026" not in t_up):
+                                detected_sn = t_clean
+                                break
+
+                    st.session_state["extracted_type"] = detected_type if detected_type else "DME-010"
+                    st.session_state["extracted_sn"] = detected_sn if detected_sn else "2CB0421 A"
+                    st.success("✅ Berhasil memindai Name Plate!")
+                except Exception as ocr_err:
+                    st.warning(f"Catatan OCR: Gagal membaca otomatis ({ocr_err}), silakan ketik manual.")
+
+    with st.form("form_input_ng", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
+            nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
+            mesin_pilih = st.selectbox("Pilih Mesin Bermasalah", ["-- Pilih Mesin --"] + machine_list)
+
+        with col2:
+            nama_sparepart = st.text_input("Dual Master", value="Dual Master Expander Device", disabled=True)
+            type_part = st.text_input("TYPE", value=st.session_state["extracted_type"])
+            nomor_seri = st.text_input("SERIAL No.", value=st.session_state["extracted_sn"])
+            qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
+
+        submitted = st.form_submit_button("🚨 Simpan & Kirim Data NG")
+        
+        if submitted:
+            if nama_mp == "-- Pilih Nama MP --" or mesin_pilih == "-- Pilih Mesin --":
+                st.error("Nama MP dan Mesin wajib dipilih!")
+            else:
+                detected_shift = MP_DATA.get(nama_mp, "General")
+                detected_line = MACHINE_DATA.get(mesin_pilih, "General Line")
+                
+                # Payload untuk Supabase (lengkap dengan foto)
+                payload_db = {
+                    "tanggal": str(tanggal_input),
+                    "shift": detected_shift,
+                    "line": detected_line,
+                    "mesin": mesin_pilih,
+                    "nama_part": "Dual Master Expander Device",
+                    "type_part": type_part if type_part else "DME-010",
+                    "no_seri": nomor_seri if nomor_seri else "2CB0421 A",
+                    "qty": int(qty_part),
+                    "teknisi": nama_mp,
+                    "status_part": "Part NG",
+                    "foto_base64": encoded_img
+                }
+                
+                # Payload untuk Google Sheets (sesuai urutan kolom bersih Anda)
+                payload_sheets = {
+                    "tanggal": str(tanggal_input),
+                    "nama": nama_mp,
+                    "shift": detected_shift,
+                    "line": detected_line,
+                    "mesin": mesin_pilih,
+                    "nama_part": "Dual Master Expander Device",
+                    "type_part": type_part if type_part else "DME-010",
+                    "no_seri": nomor_seri if nomor_seri else "2CB0421 A",
+                    "qty": int(qty_part),
+                    "status": "Part NG"
+                }
+                
+                success_all = True
+                if supabase:
+                    try:
+                        supabase.table("maintenance_log").insert(payload_db).execute()
+                    except Exception as e:
+                        st.error(f"Gagal simpan ke Supabase: {e}")
+                        success_all = False
+                
+                try:
+                    requests.post(GOOGLE_SHEETS_URL, json=payload_sheets)
+                except Exception as err:
+                    st.warning(f"Gagal kirim ke Google Sheets: {err}")
+                
+                if success_all:
+                    st.success("🎉 Data Part NG berhasil disimpan dan dikirim ke Spreadsheet!")
                     st.session_state["extracted_type"] = ""
                     st.session_state["extracted_sn"] = ""
-                except Exception as e:
-                    st.error(f"Gagal menyimpan ke database: {e}")
+
+# ==========================================
+# HALAMAN 2: DATA PART REPAIR
+# ==========================================
+elif menu == "🛠️ Data Part Repair":
+    st.markdown("<h1 class='main-title'>🛠️ Halaman Data Part Repair</h1>", unsafe_allow_html=True)
+    st.caption("Kelola dan pantau part yang sedang dalam status perbaikan.")
+    st.markdown("---")
+    
+    if supabase:
+        try:
+            response = supabase.table("maintenance_log").select("*").eq("status_part", "Part NG").execute()
+            data_repair = response.data
+            
+            if data_repair:
+                df_repair = pd.DataFrame(data_repair)
+                st.dataframe(df_repair, use_container_width=True)
             else:
-                st.error("Koneksi Supabase belum diatur!")
+                st.info("Belum ada data part yang masuk dalam daftar perbaikan.")
+        except Exception as e:
+            st.error(f"Gagal mengambil data dari database: {e}")
+    else:
+        st.warning("Database belum terhubung.")
+
+# ==========================================
+# HALAMAN 3: INPUT PART OK
+# ==========================================
+elif menu == "🟢 Input Part OK":
+    st.markdown("<h1 class='main-title'>🟢 Input Data Part OK (Selesai Repair)</h1>", unsafe_allow_html=True)
+    st.caption("Catat part yang telah selesai diperbaiki dan kembali normal.")
+    st.markdown("---")
+
+    with st.form("form_input_ok", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            tgl_ok = st.date_input("Tanggal Selesai", value=datetime.now().date())
+            teknisi_ok = st.selectbox("Teknisi / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
+            mesin_ok = st.selectbox("Pilih Mesin Terpasang", ["-- Pilih Mesin --"] + machine_list)
+
+        with col2:
+            nama_part_ok = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
+            type_ok = st.text_input("TYPE", value="DME-010")
+            seri_ok = st.text_input("SERIAL No.", value="2CB0421 A")
+            qty_ok = st.number_input("Jumlah Qty OK", min_value=1, value=1)
+
+        submitted_ok = st.form_submit_button("✅ Simpan Status Part OK")
+        
+        if submitted_ok:
+            if teknisi_ok == "-- Pilih Nama MP --" or mesin_ok == "-- Pilih Mesin --":
+                st.error("Teknisi dan Mesin wajib dipilih!")
+            else:
+                detected_shift_ok = MP_DATA.get(teknisi_ok, "General")
+                detected_line_ok = MACHINE_DATA.get(mesin_ok, "General Line")
+
+                payload_ok_db = {
+                    "tanggal": str(tgl_ok),
+                    "shift": detected_shift_ok,
+                    "line": detected_line_ok,
+                    "mesin": mesin_ok,
+                    "nama_part": "Dual Master Expander Device",
+                    "type_part": type_ok,
+                    "no_seri": seri_ok,
+                    "qty": int(qty_ok),
+                    "teknisi": teknisi_ok,
+                    "status_part": "Part OK",
+                    "foto_base64": ""
+                }
+
+                payload_ok_sheets = {
+                    "tanggal": str(tgl_ok),
+                    "nama": teknisi_ok,
+                    "shift": detected_shift_ok,
+                    "line": detected_line_ok,
+                    "mesin": mesin_ok,
+                    "nama_part": "Dual Master Expander Device",
+                    "type_part": type_ok,
+                    "no_seri": seri_ok,
+                    "qty": int(qty_ok),
+                    "status": "Part OK"
+                }
+                
+                success_ok = True
+                if supabase:
+                    try:
+                        supabase.table("maintenance_log").insert(payload_ok_db).execute()
+                    except Exception as e:
+                        st.error(f"Gagal menyimpan data OK ke Supabase: {e}")
+                        success_ok = False
+                
+                try:
+                    requests.post(GOOGLE_SHEETS_URL, json=payload_ok_sheets)
+                except Exception as err:
+                    st.warning(f"Gagal kirim ke Google Sheets: {err}")
+
+                if success_ok:
+                    st.success("🎉 Data Part OK berhasil disimpan ke sistem dan Spreadsheet!")
