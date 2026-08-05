@@ -22,10 +22,10 @@ st.set_page_config(
     page_title="Input Part NG",
     page_icon="🔴",
     layout="wide",
-    initial_sidebar_state="collapsed" # Sidebar disembunyikan total
+    initial_sidebar_state="collapsed"
 )
 
-# CSS untuk Menghilangkan Sidebar & Navigasi Bawaan Streamlit
+# CSS Styling Tampilan Bersih & Terisolasi
 st.markdown("""
 <style>
     [data-testid="stSidebar"] {
@@ -67,18 +67,21 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# --- LOAD MASTER DATA DARI EXCEL ---
+# --- LOAD SEMUA MASTER DATA DARI EXCEL SECARA LENGKAP ---
 @st.cache_data
 def load_master_data():
     try:
         df = pd.read_excel("Data Terbaru Dual Master.xlsx", sheet_name="Sheet1")
-        df_mp = df[['Shift', 'PIC']].dropna(subset=['PIC']).copy()
-        mp_list = df_mp['PIC'].tolist()
-        mp_shift_map = dict(zip(df_mp['PIC'], df_mp['Shift'].fillna('General')))
         
+        # Ambil semua data PIC dan Shift secara utuh
+        df_mp = df[['Shift', 'PIC']].dropna(subset=['PIC']).copy()
+        mp_list = df_mp['PIC'].astype(str).tolist()
+        mp_shift_map = dict(zip(df_mp['PIC'].astype(str), df_mp['Shift'].fillna('General').astype(str)))
+        
+        # Ambil semua data Machine dan Line secara utuh
         df_machine = df[['Line', 'Machine']].dropna(subset=['Machine']).copy()
-        machine_list = df_machine['Machine'].tolist()
-        machine_line_map = dict(zip(df_machine['Machine'], df_machine['Line']))
+        machine_list = df_machine['Machine'].astype(str).tolist()
+        machine_line_map = dict(zip(df_machine['Machine'].astype(str), df_machine['Line'].astype(str)))
         
         return mp_list, mp_shift_map, machine_list, machine_line_map
     except Exception as e:
@@ -86,8 +89,8 @@ def load_master_data():
 
 mp_list, mp_shift_map, machine_list, machine_line_map = load_master_data()
 
-st.markdown("<h1 class='main-title'>🔴 Input Part NG dari Mesin (Mesin Berhenti)</h1>", unsafe_allow_html=True)
-st.caption("Form khusus mandiri untuk pencatatan part rusak via scan foto.")
+st.markdown("<h1 class='main-title'>🔴 Input Part NG dari Mesin</h1>", unsafe_allow_html=True)
+st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto part, lalu klik Input.")
 st.markdown("---")
 
 # State OCR
@@ -119,19 +122,17 @@ if uploaded_file is not None:
             st.success("✅ Berhasil memindai teks dari foto!")
 
 # Form Input
-with st.form("form_input_ng_isolated", clear_on_submit=True):
+with st.form("form_input_ng_clean", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
         tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
+        
+        # Nama MP (Semua nama muncul lengkap)
         nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
         
-        detected_shift = mp_shift_map.get(nama_mp, "Shift Red") if nama_mp != "-- Pilih Nama MP --" else "-"
-        st.info(f"🕒 Shift Terdeteksi: **{detected_shift}**")
-        
-        mesin_pilih = st.selectbox("Pilih Mesin Bermasalah", ["-- Pilih Mesin --"] + machine_list)
-        detected_line = machine_line_map.get(mesin_pilih, "-") if mesin_pilih != "-- Pilih Mesin --" else "-"
-        st.info(f"🏭 Line Terdeteksi: **{detected_line}**")
+        # Pilihan Mesin (Bisa diketik untuk mencari dengan cepat, line terdeteksi otomatis di backend)
+        mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
         nama_sparepart = st.text_input("Nama Sparepart", value=st.session_state["extracted_nama"])
@@ -139,12 +140,17 @@ with st.form("form_input_ng_isolated", clear_on_submit=True):
         nomor_seri = st.text_input("Nomor Seri (Serial No.)", value=st.session_state["extracted_sn"])
         qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
 
-    submitted = st.form_submit_button("🚨 Simpan Data Part NG")
+    # Tombol submit dengan tulisan "Input"
+    submitted = st.form_submit_button("🚨 Input")
     
     if submitted:
         if nama_mp == "-- Pilih Nama MP --" or mesin_pilih == "-- Pilih Mesin --":
             st.error("Nama MP dan Mesin wajib dipilih!")
         else:
+            # Shift dan Line otomatis terambil di backend tanpa ditampilkan di layar
+            detected_shift = mp_shift_map.get(nama_mp, "General")
+            detected_line = machine_line_map.get(mesin_pilih, "General Line")
+            
             payload = {
                 "tanggal": str(tanggal_input),
                 "shift": detected_shift,
@@ -162,7 +168,7 @@ with st.form("form_input_ng_isolated", clear_on_submit=True):
             if supabase:
                 try:
                     supabase.table("maintenance_log").insert(payload).execute()
-                    st.success("🎉 Data Part NG berhasil disimpan ke database!")
+                    st.success("🎉 Data Part NG berhasil di-input!")
                     st.session_state["extracted_nama"] = ""
                     st.session_state["extracted_type"] = ""
                     st.session_state["extracted_sn"] = ""
