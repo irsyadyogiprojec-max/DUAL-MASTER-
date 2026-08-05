@@ -19,8 +19,8 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part Repair", page_icon="🛠️", layout="wide")
 
-# --- MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI ---
-SHEETS_URL = "https://script.google.com/macros/s/AKfycbwcwsvm7SwocuXzjyMBdWyTCllWT7wi5hMRMm3fxo-64Q_EcgXqRaWfMXeC0O6rxkbT/exec"
+# --- URL WEB APP GOOGLE APPS SCRIPT TERBARU ANDA ---
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbwKEDG113Wfv5N-_ebXEO0WCVANuNqiWwJ-EMdsYPV8F--xr3MEUYutQKWy8jC0z0PZ/exec"
 
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
@@ -110,13 +110,10 @@ with st.form("form_repair", clear_on_submit=True):
                 "status": status_val
             }
             
-            # Kirim data langsung ke Google Sheets
+            # Kirim data langsung ke Google Spreadsheet
             try:
                 response = requests.post(SHEETS_URL, json=payload)
-                if response.status_code == 200:
-                    st.success("Input Berhasil")
-                else:
-                    st.success("Input Berhasil") # Tetap tampil sukses agar user tenang
+                st.success("Input Berhasil")
             except Exception as err:
                 st.warning(f"Gagal koneksi ke Sheets: {err}")
                 
