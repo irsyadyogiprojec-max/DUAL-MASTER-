@@ -6,7 +6,6 @@ import base64
 import numpy as np
 import requests
 
-# Coba import EasyOCR untuk scan foto name plate
 try:
     import easyocr
     @st.cache_resource
@@ -19,8 +18,7 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part Repair", page_icon="🛠️", layout="wide")
 
-# --- URL WEB APP GOOGLE APPS SCRIPT TERBARU ANDA ---
-SHEETS_URL = "https://script.google.com/macros/s/AKfycbwKEDG113Wfv5N-_ebXEO0WCVANuNqiWwJ-EMdsYPV8F--xr3MEUYutQKWy8jC0z0PZ/exec"
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbwrO2IRNPLSzPbb9OBRS3cwRm_0_bXDGEC3KnkStQveUMiPWPnhcZAEMA3sZyVOx9iX/exec"
 
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
@@ -40,17 +38,10 @@ st.markdown("---")
 if "repair_type" not in st.session_state: st.session_state["repair_type"] = ""
 if "repair_sn" not in st.session_state: st.session_state["repair_sn"] = ""
 
-# Fitur Upload Foto & OCR untuk deteksi otomatis
 uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part Repair", type=["png", "jpg", "jpeg"])
-encoded_img = ""
-
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, width=250)
-    buffered = io.BytesIO()
-    image.save(buffered, format="JPEG")
-    encoded_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    
     if HAS_OCR:
         with st.spinner("🔍 Memindai teks..."):
             try:
@@ -89,6 +80,7 @@ with st.form("form_repair", clear_on_submit=True):
         else:
             shift = MP_DATA.get(teknisi, "General")
             
+            # Jika Done Repair, arahkan action ke "OK" agar otomatis pindah ke tab OK
             if "On Progress" in status_aksi:
                 action_type = "Repair"
                 status_val = "On Progress"
@@ -110,9 +102,8 @@ with st.form("form_repair", clear_on_submit=True):
                 "status": status_val
             }
             
-            # Kirim data langsung ke Google Spreadsheet
             try:
-                response = requests.post(SHEETS_URL, json=payload)
+                requests.post(SHEETS_URL, json=payload)
                 st.success("Input Berhasil")
             except Exception as err:
                 st.warning(f"Gagal koneksi ke Sheets: {err}")
