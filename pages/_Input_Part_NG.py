@@ -6,28 +6,31 @@ import io
 import base64
 from supabase import create_client
 
-# Coba import EasyOCR untuk pembacaan teks otomatis dari foto
+# Coba import EasyOCR untuk scan foto
 try:
     import easyocr
     @st.cache_resource
     def load_ocr_reader():
         return easyocr.Reader(['en'], gpu=False)
-    with st.spinner("Memuat sistem OCR pembaca foto..."):
-        reader = load_ocr_reader()
+    reader = load_ocr_reader()
     HAS_OCR = True
 except ImportError:
     HAS_OCR = False
 
-# Konfigurasi Halaman Khusus
+# Konfigurasi Halaman & Sembunyikan Sidebar Bawaan
 st.set_page_config(
     page_title="Input Part NG",
     page_icon="🔴",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed" # Sidebar disembunyikan total
 )
 
-# Styling Tampilan Profesional
+# CSS untuk Menghilangkan Sidebar & Navigasi Bawaan Streamlit
 st.markdown("""
 <style>
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
     .stApp {
         background: linear-gradient(135deg, #0B0F19 0%, #111827 50%, #0F172A 100%);
         color: #F3F4F6;
@@ -69,34 +72,30 @@ supabase = init_supabase()
 def load_master_data():
     try:
         df = pd.read_excel("Data Terbaru Dual Master.xlsx", sheet_name="Sheet1")
-        
-        # Ekstraksi Master PIC & Shift
         df_mp = df[['Shift', 'PIC']].dropna(subset=['PIC']).copy()
         mp_list = df_mp['PIC'].tolist()
         mp_shift_map = dict(zip(df_mp['PIC'], df_mp['Shift'].fillna('General')))
         
-        # Ekstraksi Master Line & Machine
         df_machine = df[['Line', 'Machine']].dropna(subset=['Machine']).copy()
         machine_list = df_machine['Machine'].tolist()
         machine_line_map = dict(zip(df_machine['Machine'], df_machine['Line']))
         
         return mp_list, mp_shift_map, machine_list, machine_line_map
     except Exception as e:
-        # Fallback default jika file belum terbaca
-        return ["Ammar", "Agus M", "Irul K", "Eko P"], {}, ["IDR 052", "Gondola"], {"IDR 052": "Cylinder Block"}
+        return ["Ammar", "Agus M"], {}, ["IDR 052"], {"IDR 052": "Cylinder Block"}
 
 mp_list, mp_shift_map, machine_list, machine_line_map = load_master_data()
 
 st.markdown("<h1 class='main-title'>🔴 Input Part NG dari Mesin (Mesin Berhenti)</h1>", unsafe_allow_html=True)
-st.caption("Gunakan form khusus ini saat MP menemukan abnormality/kerusakan di mesin dan melepas part NG.")
+st.caption("Form khusus mandiri untuk pencatatan part rusak via scan foto.")
 st.markdown("---")
 
-# State untuk OCR Foto
+# State OCR
 if "extracted_nama" not in st.session_state: st.session_state["extracted_nama"] = ""
 if "extracted_type" not in st.session_state: st.session_state["extracted_type"] = ""
 if "extracted_sn" not in st.session_state: st.session_state["extracted_sn"] = ""
 
-# Upload Foto Part / Label NG
+# Upload Foto
 uploaded_file = st.file_uploader("📷 Upload Foto Part / Label Seri (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
 encoded_img = ""
 
@@ -119,22 +118,17 @@ if uploaded_file is not None:
             st.session_state["extracted_sn"] = "SN-" + "".join(filter(str.isdigit, scanned_text))[:8]
             st.success("✅ Berhasil memindai teks dari foto!")
 
-# Form Input MP
-with st.form("form_input_ng_master", clear_on_submit=True):
+# Form Input
+with st.form("form_input_ng_isolated", clear_on_submit=True):
     col1, col2 = st.columns(2)
     
     with col1:
-        # Tanggal otomatis hari ini
         tanggal_input = st.date_input("Tanggal", value=datetime.now().date())
-        
-        # Pilih Nama MP (Shift otomatis terdeteksi)
         nama_mp = st.selectbox("Nama MP / Pelapor", ["-- Pilih Nama MP --"] + mp_list)
         
-        # Tampilkan shift otomatis berdasarkan MP yang dipilih
         detected_shift = mp_shift_map.get(nama_mp, "Shift Red") if nama_mp != "-- Pilih Nama MP --" else "-"
         st.info(f"🕒 Shift Terdeteksi: **{detected_shift}**")
         
-        # Pilih Mesin (Line otomatis terdeteksi)
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah", ["-- Pilih Mesin --"] + machine_list)
         detected_line = machine_line_map.get(mesin_pilih, "-") if mesin_pilih != "-- Pilih Mesin --" else "-"
         st.info(f"🏭 Line Terdeteksi: **{detected_line}**")
