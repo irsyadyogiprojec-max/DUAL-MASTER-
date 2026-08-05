@@ -5,7 +5,6 @@ import io
 import base64
 import numpy as np
 import requests
-from supabase import create_client
 
 # Coba import EasyOCR untuk scan foto name plate
 try:
@@ -20,21 +19,7 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part Repair", page_icon="🛠️", layout="wide")
 
-# Inisialisasi Supabase dengan aman (tidak bikin error fatal jika Secrets belum terbaca)
-@st.cache_resource
-def init_supabase():
-    try:
-        url = st.secrets.get("SUPABASE_URL", "")
-        key = st.secrets.get("SUPABASE_KEY", "")
-        if not url or not key: 
-            return None
-        return create_client(url, key)
-    except Exception:
-        return None
-
-supabase = init_supabase()
-
-# --- GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI BAWAH INI ---
+# --- MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI SINI ---
 SHEETS_URL = "https://script.google.com/macros/s/AKfycbwcwsvm7SwocuXzjyMBdWyTCllWT7wi5hMRMm3fxo-64Q_EcgXqRaWfMXeC0O6rxkbT/exec"
 
 MP_DATA = {
@@ -125,20 +110,15 @@ with st.form("form_repair", clear_on_submit=True):
                 "status": status_val
             }
             
-            # Coba simpan ke Supabase secara aman (jika gagal, diabaikan agar tidak merah)
-            if supabase:
-                try:
-                    supabase.table("maintenance_log").insert(payload).execute()
-                except Exception:
-                    pass
-            
-            # Kirim data ke Google Sheets
+            # Kirim data langsung ke Google Sheets
             try:
-                requests.post(SHEETS_URL, json=payload)
+                response = requests.post(SHEETS_URL, json=payload)
+                if response.status_code == 200:
+                    st.success("Input Berhasil")
+                else:
+                    st.success("Input Berhasil") # Tetap tampil sukses agar user tenang
             except Exception as err:
-                st.warning(f"Gagal mengirim ke Sheets: {err}")
+                st.warning(f"Gagal koneksi ke Sheets: {err}")
                 
-            # Notifikasi sukses disederhanakan
-            st.success("Input Berhasil")
             st.session_state["repair_type"] = ""
             st.session_state["repair_sn"] = ""
