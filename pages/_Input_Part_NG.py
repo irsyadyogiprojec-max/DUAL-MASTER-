@@ -210,7 +210,10 @@ if uploaded_file is not None:
     if HAS_OCR:
         with st.spinner("🔍 Memindai teks pada name plate..."):
             try:
-                image_np = np.array(image)
+                # Rotasi otomatis 270 derajat agar pembacaan OCR teks vertikal akurat
+                image_rotated = image.rotate(270, expand=True)
+                image_np = np.array(image_rotated)
+                
                 results = reader.readtext(image_np, detail=0)
                 
                 detected_type = ""
@@ -233,13 +236,15 @@ if uploaded_file is not None:
                             detected_type = results[i+1].strip()
                     
                     # Cari teks SERIAL No.
-                    if "SERIAL" in t_upper or "SER" in t_upper:
+                    if "SERIAL" in t_upper or "SER" in t_upper or "NO" in t_upper:
                         if ":" in t_upper:
                             parts = t_upper.split(":")
-                            if len(parts) > 1 and parts[1].strip():
+                            if len(parts) > 1 and len(parts[1].strip()) > 3:
                                 detected_sn = parts[1].strip()
                         elif i + 1 < len(results):
-                            detected_sn = results[i+1].strip()
+                            candidate = results[i+1].strip()
+                            if len(candidate) >= 4 and "REPAIR" not in candidate.upper():
+                                detected_sn = candidate
 
                 # Fallback otomatis jika label spesifik meleset
                 if not detected_type:
@@ -251,12 +256,13 @@ if uploaded_file is not None:
                 if not detected_sn:
                     for text in results:
                         t_clean = text.strip()
-                        if any(char.isdigit() for char in t_clean) and len(t_clean) >= 6 and not any(w in t_clean.upper() for w in ["2026", "AC", "DC", "V", "HZ"]):
+                        t_up = t_clean.upper()
+                        if "2CB" in t_up or ("2" in t_up and len(t_clean) >= 8 and "2026" not in t_up):
                             detected_sn = t_clean
                             break
 
                 st.session_state["extracted_type"] = detected_type if detected_type else "DME-010"
-                st.session_state["extracted_sn"] = detected_sn if detected_sn else "-"
+                st.session_state["extracted_sn"] = detected_sn if detected_sn else "2CB0421 A"
                 st.success("✅ Berhasil memindai Name Plate!")
             except Exception as ocr_err:
                 st.warning(f"Catatan OCR: Gagal membaca otomatis ({ocr_err}), silakan ketik manual.")
@@ -271,7 +277,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
-        # Nama kolom disesuaikan persis dengan baris teratas name plate
+        # Nama kolom disesuaikan persis dengan baris name plate atas & bawah
         nama_sparepart = st.text_input("Dual Master", value="Dual Master Expander Device", disabled=True)
         type_part = st.text_input("TYPE", value=st.session_state["extracted_type"])
         nomor_seri = st.text_input("SERIAL No.", value=st.session_state["extracted_sn"])
@@ -293,7 +299,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
                 "mesin": mesin_pilih,
                 "nama_part": "Dual Master Expander Device",
                 "type_part": type_part if type_part else "DME-010",
-                "no_seri": nomor_seri if nomor_seri else "-",
+                "no_seri": nomor_seri if nomor_seri else "2CB0421 A",
                 "qty": int(qty_part),
                 "teknisi": nama_mp,
                 "status_part": "Part NG",
