@@ -20,7 +20,7 @@ except ImportError:
 
 # Konfigurasi Halaman & Sembunyikan Sidebar Bawaan
 st.set_page_config(
-    page_title="Input Part NG",
+    page_title="Input Dual Master NG",
     page_icon="🔴",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -187,22 +187,21 @@ MACHINE_DATA = {
 mp_list = list(MP_DATA.keys())
 machine_list = list(MACHINE_DATA.keys())
 
-st.markdown("<h1 class='main-title'>🔴 Input Part NG dari Mesin</h1>", unsafe_allow_html=True)
-st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto part, lalu klik Input.")
+st.markdown("<h1 class='main-title'>🔴 Input Dual Master NG</h1>", unsafe_allow_html=True)
+st.caption("Pilih Nama MP, ketik/pilih mesin, scan foto label, lalu klik Input.")
 st.markdown("---")
 
 # State OCR
-if "extracted_nama" not in st.session_state: st.session_state["extracted_nama"] = ""
 if "extracted_type" not in st.session_state: st.session_state["extracted_type"] = ""
 if "extracted_sn" not in st.session_state: st.session_state["extracted_sn"] = ""
 
 # Upload Foto
-uploaded_file = st.file_uploader("📷 Upload Foto Part / Label Seri (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("📷 Upload Foto Label Dual Master (Auto-Scan OCR)", type=["png", "jpg", "jpeg"])
 encoded_img = ""
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, width=250, caption="Foto Part NG")
+    st.image(image, width=250, caption="Foto Dual Master NG")
     
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
@@ -212,15 +211,24 @@ if uploaded_file is not None:
         with st.spinner("🔍 Memindai teks pada foto..."):
             try:
                 image_np = np.array(image)
-                result = reader.readtext(image_np, detail=0)
-                scanned_text = " ".join(result)
+                results = reader.readtext(image_np, detail=0)
                 
-                st.session_state["extracted_nama"] = scanned_text[:30].upper()
-                st.session_state["extracted_type"] = "TYPE-" + "".join(filter(str.isalnum, scanned_text[:6])).upper()
-                st.session_state["extracted_sn"] = "SN-" + "".join(filter(str.isdigit, scanned_text))[:8]
-                st.success("✅ Berhasil memindai teks dari foto!")
+                detected_type = "Standard"
+                detected_sn = "-"
+                
+                for i, text in enumerate(results):
+                    t_upper = text.upper()
+                    if "TYPE" in t_upper or "TIP" in t_upper:
+                        if i + 1 < len(results):
+                            detected_type = results[i+1].upper()
+                    if any(char.isdigit() for char in text) and len(text) >= 5:
+                        detected_sn = text.strip()
+
+                st.session_state["extracted_type"] = detected_type
+                st.session_state["extracted_sn"] = detected_sn
+                st.success("✅ Berhasil memindai teks label!")
             except Exception as ocr_err:
-                st.warning(f"Catatan OCR: Gagal membaca teks otomatis ({ocr_err}), silakan ketik manual.")
+                st.warning(f"Catatan OCR: Gagal membaca otomatis ({ocr_err}), silakan ketik manual.")
 
 # Form Input
 with st.form("form_input_ng_clean", clear_on_submit=True):
@@ -232,7 +240,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
         mesin_pilih = st.selectbox("Pilih Mesin Bermasalah (Ketik untuk mencari...)", ["-- Pilih Mesin --"] + machine_list)
 
     with col2:
-        nama_sparepart = st.text_input("Nama Sparepart", value=st.session_state["extracted_nama"])
+        nama_sparepart = st.text_input("Nama Sparepart", value="Dual Master", disabled=True)
         type_part = st.text_input("Type Part / Model", value=st.session_state["extracted_type"])
         nomor_seri = st.text_input("Nomor Seri (Serial No.)", value=st.session_state["extracted_sn"])
         qty_part = st.number_input("Jumlah Part (Qty)", min_value=1, value=1)
@@ -251,7 +259,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
                 "shift": detected_shift,
                 "line": detected_line,
                 "mesin": mesin_pilih,
-                "nama_part": nama_sparepart if nama_sparepart else "Part NG Umum",
+                "nama_part": "Dual Master",
                 "type_part": type_part if type_part else "Standard",
                 "no_seri": nomor_seri if nomor_seri else "-",
                 "qty": int(qty_part),
@@ -263,8 +271,7 @@ with st.form("form_input_ng_clean", clear_on_submit=True):
             if supabase:
                 try:
                     supabase.table("maintenance_log").insert(payload).execute()
-                    st.success("🎉 Data Part NG berhasil di-input!")
-                    st.session_state["extracted_nama"] = ""
+                    st.success("🎉 Data Dual Master NG berhasil di-input!")
                     st.session_state["extracted_type"] = ""
                     st.session_state["extracted_sn"] = ""
                 except Exception as e:
