@@ -18,25 +18,55 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
 
-# Styling CSS Tema Mewah (Dominan Putih/Krim, Marun, dan Aksen Gold)
+# CSS Styling untuk tema Putih bersih + Kotak Form Gelap + Aksen Marun & Gold Mewah
 st.markdown("""
     <style>
+    /* Background utama putih bersih */
     .stApp {
-        background-color: #FDFBF7;
+        background-color: #FFFFFF;
     }
+    
+    /* Judul dan teks */
     h1, h2, h3 {
-        color: #5A1827 !important;
+        color: #6b1d2f !important;
     }
     p, label, .stMarkdown {
         color: #2C2C2C !important;
     }
+    
+    /* Garis pembatas warna marun */
+    hr {
+        border-color: #6b1d2f !important;
+    }
+
+    /* Kotak Upload File mirip kartu */
+    [data-testid="stFileUploader"] {
+        background-color: #FDFBF7;
+        border: 1px solid #E6DCC3;
+        border-radius: 8px;
+        padding: 15px;
+    }
+
+    /* Input/Selectbox kotak menjadi gelap (menyesuaikan referensi) */
+    div.stTextInput > div > div > input, 
+    div.stSelectbox > div > div > div, 
+    div.stDateInput > div > div > input,
+    div.stNumberInput > div > div > input {
+        background-color: #2A2A2A !important;
+        color: #FFFFFF !important;
+        border-radius: 6px;
+        border: 1px solid #444444;
+    }
+
+    /* Tombol Simpan warna Marun mewah dengan teks Gold */
     .stButton>button {
         background-color: #6b1d2f;
-        color: #D4AF37;
+        color: #F3E5AB;
         border: 1px solid #D4AF37;
         border-radius: 6px;
         width: 100%;
         font-weight: bold;
+        padding: 10px;
     }
     .stButton>button:hover {
         background-color: #8c263d;
@@ -60,7 +90,7 @@ MP_DATA = {
 }
 mp_list = list(MP_DATA.keys())
 
-# Mapping Mesin dan Line Lengkap berdasarkan data Anda
+# Database Mesin dan Line Lengkap
 MACHINE_LINE_MAPPING = {
     "IDR 052": "Cylinder Block", "Gondola": "Cylinder Block", "GRAFIR CR.SIZE": "Cylinder Block",
     "IAM 008": "Cylinder Block", "IAT 033": "Cylinder Block", "IAT 034": "Cylinder Block",
@@ -217,7 +247,6 @@ with st.form("form_ng", clear_on_submit=True):
             st.error("Mesin wajib dipilih!")
         else:
             shift = MP_DATA.get(teknisi, "General")
-            # Otomatis tentukan Line berdasarkan Mesin yang dipilih dari database
             line_terdeteksi = MACHINE_LINE_MAPPING.get(mesin, "-")
 
             payload = {
@@ -225,13 +254,13 @@ with st.form("form_ng", clear_on_submit=True):
                 "tanggal": str(tanggal), 
                 "nama": teknisi, 
                 "shift": shift,
-                "line": line_terdeteksi,  # Otomatis masuk ke Spreadsheet
+                "line": line_terdeteksi,  # Otomatis tercatat di spreadsheet
                 "mesin": mesin, 
                 "nama_part": nama_part, 
                 "type_part": type_part if type_part else "-",
                 "no_seri": no_seri if no_seri else "-", 
                 "qty": int(qty), 
-                "status": "NG"  # Status otomatis NG
+                "status": "NG"
             }
             
             try:
