@@ -2,8 +2,8 @@ import streamlit as st
 import datetime
 import re
 import requests
-import numpy as np
-from PIL import Image, ImageEnhance
+import io
+from PIL import Image
 
 # 1. Konfigurasi Halaman & Endpoint Google Sheets
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="centered")
@@ -16,83 +16,73 @@ if "ng_type" not in st.session_state:
 if "ng_sn" not in st.session_state:
     st.session_state["ng_sn"] = ""
 
-# 3. Safe OCR Loading (Mencegah crash jika EasyOCR/OpenCV error di server)
-HAS_OCR = False
-reader = None
-
-try:
-    import easyocr
-    @st.cache_resource
-    def load_ocr_reader():
-        return easyocr.Reader(['en'], gpu=False)
-    reader = load_ocr_reader()
-    HAS_OCR = True
-except Exception:
-    HAS_OCR = False
-
-# 4. Pre-Processing Gambar Aman (Upscale + Enhance)
-def enhance_image_for_ocr(pil_img):
-    try:
-        w, h = pil_img.size
-        filter_type = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.BICUBIC)
-        img_resized = pil_img.resize((w * 2, h * 2), filter_type)
-        enhancer = ImageEnhance.Contrast(img_resized)
-        return enhancer.enhance(2.0)
-    except Exception:
-        return pil_img
-
-# 5. Fungsi Auto-Scan OCR dengan Koreksi Karakter L -> A
-def scan_rotated_label(pil_img):
-    if not HAS_OCR or reader is None:
-        return "", ""
-    
+# 3. Fungsi OCR via Cloud API (Ringan RAM & Bebas Crash)
+def scan_label_via_api(pil_img):
     detected_type = ""
     detected_sn = ""
     
-    enhanced_img = enhance_image_for_ocr(pil_img)
-    angles = [0, 270, 90, 180]
-    
-    for angle in angles:
-        try:
-            rotated = enhanced_img.rotate(angle, expand=True) if angle != 0 else enhanced_img
-            img_np = np.array(rotated)
-            results = reader.readtext(img_np, detail=0)
-            full_text = " ".join(results).upper()
+    try:
+        # Konversi gambar ke byte JPEG
+        img_byte_arr = io.BytesIO()
+        # Ubah mode ke RGB jika RGBA/PNG
+        if pil_img.mode in ("RGBA", "P"):
+            pil_img = pil_img.convert("RGB")
+        pil_img.save(img_byte_arr, format='JPEG', quality=95)
+        img_bytes = img_byte_arr.getvalue()
+
+        # Panggil Free OCR API
+        url = 'https://api.ocr.space/parse/image'
+        payload = {
+            'apikey': 'helloworld',  # Key publik gratis
+            'language': 'eng',
+            'isTable': False,
+            'OCREngine': 2,
+            'scale': True
+        }
+        files = {'filename': ('image.jpg', img_bytes, 'image/jpeg')}
+        
+        response = requests.post(url, data=payload, files=files, timeout=12)
+        res_json = response.json()
+
+        if not res_json.get("IsErroredOnProcessing") and res_json.get("ParsedResults"):
+            full_text = res_json["ParsedResults"][0]["ParsedText"].upper()
             
             # Deteksi TYPE (Contoh: DME-010)
-            if not detected_type:
-                type_match = re.search(r'TYPE[:\s]*([A-Z0-9-]+)', full_text)
-                if type_match:
-                    detected_type = type_match.group(1).strip()
-                elif "DME" in full_text:
-                    dme_match = re.search(r'(DME-[0-9]+)', full_text)
-                    if dme_match:
-                        detected_type = dme_match.group(1).strip()
+            type_match = re.search(r'TYPE[:\s]*([A-Z0-9-]+)', full_text)
+            if type_match:
+                detected_type = type_match.group(1).strip()
+            elif "DME" in full_text:
+                dme_match = re.search(r'(DME-[0-9]+)', full_text)
+                if dme_match:
+                    detected_type = dme_match.group(1).strip()
 
-            # Deteksi SERIAL No.
-            if not detected_sn:
-                sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,12})', full_text)
-                raw_sn = ""
-                if sn_match:
-                    raw_sn = sn_match.group(1).strip()
-                else:
-                    direct_match = re.search(r'([0-9][A-Z0-9]{5,8}\s*[A-Z1L])', full_text)
-                    if direct_match:
-                        raw_sn = direct_match.group(1).strip()
+            # Deteksi SERIAL No. (Contoh: 2CB0421 A)
+            sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,12})', full_text)
+            raw_sn = ""
+            if sn_match:
+                raw_sn = sn_match.group(1).strip()
+            else:
+                direct_match = re.search(r'([0-9][A-Z0-9]{5,8}\s*[A-Z1L])', full_text)
+                if direct_match:
+                    raw_sn = direct_match.group(1).strip()
 
-                if raw_sn:
-                    # KOREKSI OTOMATIS: Mengubah huruf 'L', '1', atau 'I' di akhiran serial number menjadi 'A'
-                    raw_sn = re.sub(r'(\d[A-Z0-9]{5,7}\s+)[L1I]$', r'\1A', raw_sn)
-                    detected_sn = raw_sn
+            if raw_sn:
+                # KOREKSI OTOMATIS: Jika OCR salah membaca 'A' menjadi 'L', '1', atau 'I' di akhir serial
+                raw_sn = re.sub(r'(\d[A-Z0-9]{5,7}\s+)[L1I]$', r'\1A', raw_sn)
+                detected_sn = raw_sn
 
-            if detected_type and detected_sn:
-                break
-        except Exception:
-            continue
-            
+    except Exception:
+        pass
+
+    # Nilai default jika OCR gagal mengenali
+    if not detected_type:
+        detected_type = "DME-010"
+    if not detected_sn:
+        detected_sn = "2CB0421 A"
+
     return detected_type, detected_sn
 
-# 6. Styling Tampilan Dark Theme
+# 4. Styling Tampilan Dark Theme
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -150,7 +140,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 7. Database MP & Mesin
+# 5. Database MP & Mesin
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -234,28 +224,24 @@ MACHINE_LINE_MAPPING = {
 }
 mesin_list = sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-# 8. Header
+# 6. Header Form
 st.markdown('<div class="title-text">❌ Input Part NG (Not Good)</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle-text">Formulir pelaporan part tidak sesuai standar</div>', unsafe_allow_html=True)
 
-# 9. Upload Foto & Pemindaian Auto-Scan
+# 7. Upload Foto & Pemindaian Auto-Scan
 uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part NG", type=["png", "jpg", "jpeg"])
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, width=280)
     
-    if HAS_OCR:
-        with st.spinner("🔍 Memindai TYPE & SERIAL No..."):
-            d_type, d_sn = scan_rotated_label(image)
-            st.session_state["ng_type"] = d_type if d_type else "DME-010"
-            st.session_state["ng_sn"] = d_sn if d_sn else "2CB0421 A"
-    else:
-        st.session_state["ng_type"] = "DME-010"
-        st.session_state["ng_sn"] = "2CB0421 A"
+    with st.spinner("🔍 Memindai TYPE & SERIAL No..."):
+        d_type, d_sn = scan_label_via_api(image)
+        st.session_state["ng_type"] = d_type
+        st.session_state["ng_sn"] = d_sn
 
 st.write("")
 
-# 10. Form Input Utama
+# 8. Form Input Utama
 with st.form("form_ng", clear_on_submit=False):
     col1, col2 = st.columns(2)
     
