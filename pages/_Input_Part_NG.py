@@ -16,7 +16,10 @@ if "ng_type" not in st.session_state:
 if "ng_sn" not in st.session_state:
     st.session_state["ng_sn"] = ""
 
-# 3. Setup Engine EasyOCR
+# 3. Safe OCR Loading (Mencegah crash jika EasyOCR/OpenCV error di server)
+HAS_OCR = False
+reader = None
+
 try:
     import easyocr
     @st.cache_resource
@@ -24,38 +27,35 @@ try:
         return easyocr.Reader(['en'], gpu=False)
     reader = load_ocr_reader()
     HAS_OCR = True
-except ImportError:
+except Exception:
     HAS_OCR = False
 
-# 4. Fungsi Pre-Processing Gambar agar Teks Lebih Tajam
+# 4. Pre-Processing Gambar Aman (Upscale + Enhance)
 def enhance_image_for_ocr(pil_img):
-    # Perbesar resolusi gambar 2x lipat agar detail huruf 'A' dan 'L' tidak samar
-    w, h = pil_img.size
-    img_resized = pil_img.resize((w * 2, h * 2), Image.LANCZOS)
-    
-    # Tingkatkan kontras gambar
-    enhancer = ImageEnhance.Contrast(img_resized)
-    img_contrast = enhancer.enhance(2.0)
-    return img_contrast
+    try:
+        w, h = pil_img.size
+        filter_type = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', Image.BICUBIC)
+        img_resized = pil_img.resize((w * 2, h * 2), filter_type)
+        enhancer = ImageEnhance.Contrast(img_resized)
+        return enhancer.enhance(2.0)
+    except Exception:
+        return pil_img
 
-# 5. Fungsi Auto-Scan OCR dengan Koreksi Karakter
+# 5. Fungsi Auto-Scan OCR dengan Koreksi Karakter L -> A
 def scan_rotated_label(pil_img):
-    if not HAS_OCR:
+    if not HAS_OCR or reader is None:
         return "", ""
     
     detected_type = ""
     detected_sn = ""
     
-    # Pertajam & perbesar gambar sebelum OCR
     enhanced_img = enhance_image_for_ocr(pil_img)
-    
-    # Coba sudut rotasi (0°, 270°, 90°, 180°)
     angles = [0, 270, 90, 180]
     
     for angle in angles:
-        rotated = enhanced_img.rotate(angle, expand=True) if angle != 0 else enhanced_img
-        img_np = np.array(rotated)
         try:
+            rotated = enhanced_img.rotate(angle, expand=True) if angle != 0 else enhanced_img
+            img_np = np.array(rotated)
             results = reader.readtext(img_np, detail=0)
             full_text = " ".join(results).upper()
             
@@ -69,19 +69,19 @@ def scan_rotated_label(pil_img):
                     if dme_match:
                         detected_type = dme_match.group(1).strip()
 
-            # Deteksi SERIAL No. (Contoh: 2CB0421 A)
+            # Deteksi SERIAL No.
             if not detected_sn:
                 sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,12})', full_text)
+                raw_sn = ""
                 if sn_match:
                     raw_sn = sn_match.group(1).strip()
                 else:
-                    # Pattern matching langsung format kode serial (e.g. 2CB0421 A)
                     direct_match = re.search(r'([0-9][A-Z0-9]{5,8}\s*[A-Z1L])', full_text)
-                    raw_sn = direct_match.group(1).strip() if direct_match else ""
+                    if direct_match:
+                        raw_sn = direct_match.group(1).strip()
 
                 if raw_sn:
-                    # KOREKSI OTOMATIS KESALAHAN OCR UMUM:
-                    # Jika berakhiran ' L', ' 1', atau ' I' setelah format angka/huruf serial, ubah ke ' A'
+                    # KOREKSI OTOMATIS: Mengubah huruf 'L', '1', atau 'I' di akhiran serial number menjadi 'A'
                     raw_sn = re.sub(r'(\d[A-Z0-9]{5,7}\s+)[L1I]$', r'\1A', raw_sn)
                     detected_sn = raw_sn
 
@@ -249,6 +249,9 @@ if uploaded_file is not None:
             d_type, d_sn = scan_rotated_label(image)
             st.session_state["ng_type"] = d_type if d_type else "DME-010"
             st.session_state["ng_sn"] = d_sn if d_sn else "2CB0421 A"
+    else:
+        st.session_state["ng_type"] = "DME-010"
+        st.session_state["ng_sn"] = "2CB0421 A"
 
 st.write("")
 
