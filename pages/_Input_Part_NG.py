@@ -117,7 +117,7 @@ MP_DATA = {
 }
 mp_list = ["-- Pilih --"] + list(MP_DATA.keys())
 
-# --- Database Mesin & Line Lengkap (SUDAH DIPERBAIKI & DITUTUP) ---
+# --- Database Mesin & Line Lengkap (SUDAH DIPERBAIKI) ---
 MACHINE_LINE_MAPPING = {
     "IDR 052": "Cylinder Block", "Gondola": "Cylinder Block", "GRAFIR CR.SIZE": "Cylinder Block",
     "IAM 008": "Cylinder Block", "IAT 033": "Cylinder Block", "IAT 034": "Cylinder Block",
@@ -186,4 +186,4 @@ MACHINE_LINE_MAPPING = {
     "ISP 057": "Crank Shaft", "IWB 027": "Crank Shaft", "IMIH 014": "Crank Shaft",
     "ISP 063": "Crank Shaft", "ISP 064": "Crank Shaft", "ISP 065": "Crank Shaft",
     "ISP 066": "Crank Shaft", "ISP 067": "Crank Shaft", "ISP 060": "Crank Shaft",
-    "ISP 068
+    "ISP 068": "Crank Shaft", "ILS 023": "Crank Shaft", "ILA 005
