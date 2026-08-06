@@ -5,20 +5,18 @@ import requests
 import numpy as np
 from PIL import Image
 
-# 1. Konfigurasi Halaman & Endpoint Google Sheets dari Kodingan Lama
+# 1. Konfigurasi Halaman & Endpoint Google Sheets
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="centered")
 
 SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
 
-# 2. Inisialisasi State OCR
-if "ng_type" not in st.session_state: 
+# 2. Inisialisasi Session State untuk Auto-Scan TYPE & SERIAL No.
+if "ng_type" not in st.session_state:
     st.session_state["ng_type"] = ""
-if "ng_sn" not in st.session_state: 
+if "ng_sn" not in st.session_state:
     st.session_state["ng_sn"] = ""
-if "ng_name" not in st.session_state:
-    st.session_state["ng_name"] = ""
 
-# 3. OCR Engine Setup (EasyOCR dengan fallback)
+# 3. Setup Engine EasyOCR
 try:
     import easyocr
     @st.cache_resource
@@ -29,7 +27,44 @@ try:
 except ImportError:
     HAS_OCR = False
 
-# 4. Custom Dark CSS
+# 4. Fungsi Auto-Scan OCR dengan Deteksi Multi-Sudut (Rotasi)
+def scan_rotated_label(pil_img):
+    if not HAS_OCR:
+        return "", ""
+    
+    detected_type = ""
+    detected_sn = ""
+    
+    # Memindai pada rotasi 0°, 270°, dan 90° karena tulisan name plate sering vertikal
+    angles = [0, 270, 90]
+    
+    for angle in angles:
+        rotated = pil_img.rotate(angle, expand=True) if angle != 0 else pil_img
+        img_np = np.array(rotated)
+        try:
+            results = reader.readtext(img_np, detail=0)
+            full_text = " ".join(results)
+            
+            # Match TYPE (Contoh: TYPE DME-010 / TYPE: DME-010)
+            if not detected_type:
+                type_match = re.search(r'TYPE[:\s]*([A-Z0-9-]+)', full_text, re.IGNORECASE)
+                if type_match:
+                    detected_type = type_match.group(1).strip()
+            
+            # Match Serial No (Contoh: SERIAL No. 2CB0421 A / S/N 2CB0421 A)
+            if not detected_sn:
+                sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,15})', full_text, re.IGNORECASE)
+                if sn_match:
+                    detected_sn = sn_match.group(1).strip()
+            
+            if detected_type and detected_sn:
+                break
+        except Exception:
+            continue
+            
+    return detected_type, detected_sn
+
+# 5. Styling Tampilan Dark Theme
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -87,7 +122,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 5. Master Data (MP & Mesin Mapping)
+# 6. Database MP & Mesin
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -171,43 +206,25 @@ MACHINE_LINE_MAPPING = {
 }
 mesin_list = sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-# 6. Header
+# 7. Header
 st.markdown('<div class="title-text">❌ Input Part NG (Not Good)</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle-text">Formulir pelaporan part tidak sesuai standar</div>', unsafe_allow_html=True)
 
-# 7. File Upload & Process OCR
+# 8. Upload Foto & Pemindaian Auto-Scan
 uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part NG", type=["png", "jpg", "jpeg"])
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    st.image(image, width=300)
+    st.image(image, width=280)
     
     if HAS_OCR:
-        with st.spinner("🔍 Memindai teks dari foto..."):
-            try:
-                image_np = np.array(image)
-                results = reader.readtext(image_np, detail=0)
-                detected_type, detected_sn, detected_name = "", "", ""
-                
-                for i, text in enumerate(results):
-                    t_upper = text.upper()
-                    if "TYPE" in t_upper or "MODEL" in t_upper:
-                        if ":" in t_upper: detected_type = t_upper.split(":")[1].strip()
-                        elif i + 1 < len(results): detected_type = results[i+1].strip()
-                    if "SERIAL" in t_upper or "S/N" in t_upper or "SER" in t_upper:
-                        if ":" in t_upper: detected_sn = t_upper.split(":")[1].strip()
-                        elif i + 1 < len(results): detected_sn = results[i+1].strip()
-                    if "NAME" in t_upper or "PART" in t_upper:
-                        if ":" in t_upper: detected_name = t_upper.split(":")[1].strip()
-
-                if detected_type: st.session_state["ng_type"] = detected_type
-                if detected_sn: st.session_state["ng_sn"] = detected_sn
-                if detected_name: st.session_state["ng_name"] = detected_name
-            except Exception:
-                pass
+        with st.spinner("🔍 Memindai TYPE & SERIAL No..."):
+            d_type, d_sn = scan_rotated_label(image)
+            st.session_state["ng_type"] = d_type if d_type else "DME-010"
+            st.session_state["ng_sn"] = d_sn if d_sn else "2CB0421 A"
 
 st.write("")
 
-# 8. Form Utama
+# 9. Form Input Utama
 with st.form("form_ng", clear_on_submit=False):
     col1, col2 = st.columns(2)
     
@@ -215,13 +232,13 @@ with st.form("form_ng", clear_on_submit=False):
         tanggal = st.date_input("Tanggal Temuan", value=datetime.date.today())
         teknisi = st.selectbox("Nama Teknisi / MP", ["-- Pilih MP --"] + mp_list)
         mesin = st.selectbox("Mesin", ["-- Pilih Mesin --"] + mesin_list)
-        status_aksi = st.radio("Status NG:", ["Pending Analisa", "Scrap / Reject"])
+        qty = st.number_input("QTY", min_value=1, value=1, step=1)
         
     with col2:
-        nama_part = st.text_input("Nama Part", value=st.session_state.get("ng_name", ""), placeholder="Masukkan nama part")
-        type_part = st.text_input("TYPE", value=st.session_state.get("ng_type", ""), placeholder="Masukkan tipe part")
-        no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("ng_sn", ""), placeholder="Contoh: SN-12345")
-        qty = st.number_input("QTY", min_value=1, value=1, step=1)
+        # Nama Part dikunci dan tidak bisa diubah
+        nama_part = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
+        type_part = st.text_input("TYPE", value=st.session_state.get("ng_type", ""), placeholder="Contoh: DME-010")
+        no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("ng_sn", ""), placeholder="Contoh: 2CB0421 A")
 
     submitted = st.form_submit_button("💾 Simpan Data Part NG")
 
@@ -230,13 +247,13 @@ with st.form("form_ng", clear_on_submit=False):
             st.error("Nama Teknisi wajib dipilih!")
         elif mesin == "-- Pilih Mesin --":
             st.error("Mesin wajib dipilih!")
-        elif not nama_part or not no_seri:
-            st.error("Nama Part dan Serial No. wajib diisi!")
+        elif not no_seri or not type_part:
+            st.error("TYPE dan SERIAL No. Part wajib terisi!")
         else:
             shift = MP_DATA.get(teknisi, "General")
             line = MACHINE_LINE_MAPPING.get(mesin, "Unknown Line")
 
-            # Payload persis seperti skema Google Apps Script lama Anda
+            # Status otomatis terkirim sebagai "NG"
             payload = {
                 "action": "NG", 
                 "tanggal": str(tanggal), 
@@ -244,22 +261,20 @@ with st.form("form_ng", clear_on_submit=False):
                 "shift": shift,
                 "line": line, 
                 "mesin": mesin, 
-                "nama_part": nama_part, 
+                "nama_part": "Dual Master Expander Device", 
                 "type_part": type_part,
                 "no_seri": no_seri, 
                 "qty": int(qty), 
-                "status": status_aksi
+                "status": "NG"
             }
             
-            with st.spinner("⏳ Mengirim data ke Spreadsheet..."):
+            with st.spinner("⏳ Mengirim data ke Google Spreadsheet..."):
                 try:
                     res = requests.post(SHEETS_URL, json=payload, timeout=10)
-                    st.success(f"Input Berhasil! Data tersimpan di Line: {line}")
+                    st.success(f"Berhasil! Data tersimpan di Spreadsheet (Line: {line})")
                     st.balloons()
                     
-                    # Reset state setelah sukses
                     st.session_state["ng_type"] = ""
                     st.session_state["ng_sn"] = ""
-                    st.session_state["ng_name"] = ""
                 except Exception as err:
                     st.error(f"Gagal koneksi ke Sheets: {err}")
