@@ -1,6 +1,3 @@
 streamlit
-pandas
-openpyxl
+requests
 pillow
-supabase
-easyocr
