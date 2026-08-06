@@ -16,7 +16,7 @@ if "ok_type" not in st.session_state:
 if "ok_sn" not in st.session_state:
     st.session_state["ok_sn"] = ""
 
-# 3. Fungsi OCR via API Cloud (Ringan, Fast & Bebas Crash RAM)
+# 3. Fungsi OCR via API Cloud (Ringan & Bebas Crash RAM)
 def scan_label_api(pil_img):
     try:
         img_byte_arr = io.BytesIO()
@@ -50,7 +50,7 @@ def scan_label_api(pil_img):
         
     return "DME-010", "2CB0421 A"
 
-# 4. Styling Tampilan Dark Theme (Sama Persis Seperti Part NG & Repair)
+# 4. Styling Tampilan Dark Theme (Sama Persis Seperti Part Repair & NG)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -191,7 +191,7 @@ if uploaded_file is not None:
 
 st.write("")
 
-# 8. Form Utama
+# 8. Form Utama (2 Kolom Persis Seperti Repair)
 with st.form("form_ok", clear_on_submit=False):
     col1, col2 = st.columns(2)
     
@@ -243,4 +243,3 @@ with st.form("form_ok", clear_on_submit=False):
                     st.session_state["ok_sn"] = ""
                 except Exception as err:
                     st.error(f"Gagal koneksi ke Sheets: {err}")
-                    
