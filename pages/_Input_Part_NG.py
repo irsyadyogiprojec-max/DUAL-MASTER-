@@ -4,84 +4,112 @@ from PIL import Image
 import requests
 import json
 
-# 1. Konfigurasi Halaman
-st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
+# 1. Konfigurasi Halaman (Menggunakan 'centered' agar tidak merenggang terlalu lebar)
+st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="centered")
 
-# 2. CSS Styling (Tema Mewah Marun & Gold Glassmorphism)
+# 2. CSS Custom Theme Luxury Dark & Glassmorphism
 st.markdown("""
     <style>
-    /* Background Utama */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+    /* Font Global */
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* Background Utama Dark Luxury Gradient */
     .stApp {
-        background-color: #FFFFFF;
+        background: linear-gradient(135deg, #0F1015 0%, #171922 100%);
+        color: #E2E8F0;
     }
-    
+
+    /* Membatasi lebar kontainer agar rapi di tengah */
+    .block-container {
+        max-width: 800px !important;
+        padding-top: 2.5rem;
+        padding-bottom: 3rem;
+    }
+
     /* Judul Utama */
-    h1, h2, h3 {
-        color: #5A1827 !important;
-        font-weight: 600;
+    .title-text {
+        color: #F3E5AB;
+        font-size: 26px;
+        font-weight: 700;
+        margin-bottom: 4px;
     }
-    
-    /* Label Teks */
-    p, label, .stMarkdown {
-        color: #333333 !important;
+    .subtitle-text {
+        color: #94A3B8;
+        font-size: 14px;
+        margin-bottom: 20px;
     }
 
-    /* Styling Input Field Dark Mode */
-    div.stTextInput > div > div > input, 
-    div.stDateInput > div > div > input,
-    div.stNumberInput > div > div > input {
-        background-color: #262626 !important;
+    /* Label Input */
+    label {
+        color: #CBD5E1 !important;
+        font-weight: 500 !important;
+        font-size: 14px !important;
+        margin-bottom: 6px !important;
+    }
+
+    /* Styling Kotak Input & Dropdown */
+    div[data-baseweb="input"], 
+    div[data-baseweb="select"] > div {
+        background-color: #1E2230 !important;
+        border: 1px solid #333A4E !important;
+        border-radius: 8px !important;
         color: #FFFFFF !important;
-        border-radius: 4px;
-        border: 1px solid #404040;
-        font-family: monospace;
     }
-    
-    /* Styling Dropdown */
-    div.stSelectbox > div > div > div {
-        background-color: #262626 !important;
+
+    div[data-baseweb="input"]:focus-within, 
+    div[data-baseweb="select"]:focus-within {
+        border-color: #D4AF37 !important;
+        box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
+    }
+
+    /* Teks dalam Input & Dropdown */
+    input {
         color: #FFFFFF !important;
-        border-radius: 4px;
-        border: 1px solid #404040;
     }
     
-    div.stSelectbox svg {
-        fill: #D4AF37 !important;
-    }
-
-    ::placeholder { color: #AAAAAA !important; }
-
-    /* Area Upload File */
-    div.stFileUploader {
-        background-color: #FDFDFD;
-        border: 1px solid #E0E0E0;
-        border-radius: 5px;
-        padding: 10px;
-    }
-    
-    div.stFileUploader > section > button {
-        background-color: #5A1827 !important;
+    div[data-baseweb="select"] * {
         color: #FFFFFF !important;
-        border: none;
+        background-color: #1E2230 !important;
     }
 
-    /* Tombol Simpan Utama */
-    .stButton>button {
-        background-color: #5A1827 !important;
-        color: #F3E5AB !important;
-        border: 1px solid #D4AF37 !important;
-        border-radius: 4px;
-        width: 100%;
-        font-weight: bold;
+    /* File Uploader Styling */
+    div[data-testid="stFileUploader"] {
+        background-color: #1E2230;
+        border: 1.5px dashed #D4AF37;
+        border-radius: 10px;
         padding: 12px;
-        font-size: 16px;
+    }
+
+    div[data-testid="stFileUploader"] section {
+        background-color: transparent !important;
+    }
+
+    /* Tombol Simpan Mewah (Marun + Emas Glow) */
+    div.stButton > button {
+        background: linear-gradient(135deg, #8B1E37 0%, #5B1021 100%) !important;
+        color: #FFF !important;
+        border: 1px solid #D4AF37 !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        padding: 14px 28px !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+        box-shadow: 0 4px 15px rgba(139, 30, 55, 0.5);
+        transition: all 0.3s ease !important;
         text-transform: uppercase;
         letter-spacing: 1px;
+        margin-top: 15px;
     }
-    .stButton>button:hover {
-        background-color: #751F33 !important;
-        color: #FFFFFF !important;
-        border-color: #FFFFFF !important;
+
+    div.stButton > button:hover {
+        background: linear-gradient(135deg, #A82544 0%, #75152B 100%) !important;
+        color: #F3E5AB !important;
+        box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+        transform: translateY(-2px);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -97,11 +125,9 @@ MP_DATA = {
     "M Derajat": "White", "Deni P": "Staff", "Mamun": "Staff", "Wahyu R": "Staff",
     "Rizky": "Staff", "Rain B": "White", "Irsyad": "White", "Ryan F": "Staff", "Asep": "Red"
 }
-mp_list = ["-- Pilih --"] + list(MP_DATA.keys())
+mp_list = ["-- Pilih MP --"] + sorted(list(MP_DATA.keys()))
 
-# Database Mapping Mesin Ke Line (Lengkap & Sintaks Terpasang Sempurna)
 MACHINE_LINE_MAPPING = {
-    # Cylinder Block
     "IDR 052": "Cylinder Block", "Gondola": "Cylinder Block", "GRAFIR CR.SIZE": "Cylinder Block",
     "IAM 008": "Cylinder Block", "IAT 033": "Cylinder Block", "IAT 034": "Cylinder Block",
     "IBR 018": "Cylinder Block", "IBR 019": "Cylinder Block", "IBR 022": "Cylinder Block",
@@ -132,40 +158,35 @@ MACHINE_LINE_MAPPING = {
     "ITP 004": "Cylinder Block", "ITS 005": "Cylinder Block", "ITS 015": "Cylinder Block",
     "ITS 016": "Cylinder Block", "ITS 033": "Cylinder Block", "IWB 026": "Cylinder Block",
     "IWB 032": "Cylinder Block", "IWB 033": "Cylinder Block", "Junbiki": "Cylinder Block",
-    "LASER MARKING CB": "Cylinder Block",
-
-    # Cylinder Head
-    "COBOT": "Cylinder Head", "DAISHA": "Cylinder Head", "IAT 001": "Cylinder Head",
-    "IAT 002": "Cylinder Head", "IAT 003": "Cylinder Head", "IDR 040": "Cylinder Head",
-    "IMI 040": "Cylinder Head", "ISP 005": "Cylinder Head", "ISP 009": "Cylinder Head",
-    "ISP 016": "Cylinder Head", "ISP 018": "Cylinder Head", "ISP 019": "Cylinder Head",
-    "ISP 022": "Cylinder Head", "ISP 023": "Cylinder Head", "ISP 026": "Cylinder Head",
-    "ISP 027": "Cylinder Head", "ISP 028": "Cylinder Head", "ISP 029": "Cylinder Head",
-    "ISP 030": "Cylinder Head", "ISP 031": "Cylinder Head", "ISP 032": "Cylinder Head",
-    "ISP 033": "Cylinder Head", "ISP 034": "Cylinder Head", "ISP 035": "Cylinder Head",
-    "ISP 036": "Cylinder Head", "ISP 037": "Cylinder Head", "ISP 038": "Cylinder Head",
-    "ISP 039": "Cylinder Head", "ISP 040": "Cylinder Head", "ISP 041": "Cylinder Head",
-    "ISP 042": "Cylinder Head", "ISP 043": "Cylinder Head", "ISP 045": "Cylinder Head",
-    "ISP 046": "Cylinder Head", "ISP 047": "Cylinder Head", "ISP 048": "Cylinder Head",
-    "ISP 049": "Cylinder Head", "ISP 050": "Cylinder Head", "ISP 051": "Cylinder Head",
-    "ISP 052": "Cylinder Head", "ISP 053": "Cylinder Head", "ISP 090": "Cylinder Head",
-    "ISP 091": "Cylinder Head", "ISP 093": "Cylinder Head", "ISP 094": "Cylinder Head",
-    "ISP 099": "Cylinder Head", "ISPS 001": "Cylinder Head", "ISPS 002": "Cylinder Head",
-    "ISPS 003": "Cylinder Head", "ISPS 004": "Cylinder Head", "ISPS 005": "Cylinder Head",
-    "ISPS 006": "Cylinder Head", "ISPS 007": "Cylinder Head", "ISPS 008": "Cylinder Head",
-    "ISPS 009": "Cylinder Head", "ISPS 010": "Cylinder Head", "ISPS 011": "Cylinder Head",
-    "ISPS 012": "Cylinder Head", "ISPS 013": "Cylinder Head", "ISPS 014": "Cylinder Head",
-    "ISPS 015": "Cylinder Head", "ISPS 016": "Cylinder Head", "ISPS 017": "Cylinder Head",
-    "ISPS 018": "Cylinder Head", "ISPS 019": "Cylinder Head", "ISPS 020": "Cylinder Head",
-    "ISPS 021": "Cylinder Head", "ISPS 022": "Cylinder Head", "ISPS 023": "Cylinder Head",
-    "ISPS 024": "Cylinder Head", "ISPS 025": "Cylinder Head", "ISPS 026": "Cylinder Head",
-    "ISPS 034": "Cylinder Head", "ISPS 035": "Cylinder Head", "ISPS 049": "Cylinder Head",
-    "ITS 013": "Cylinder Head", "ITS 014": "Cylinder Head", "IWB 022": "Cylinder Head",
-    "IWBS 001": "Cylinder Head", "IZK 044": "Cylinder Head", "IZK 046": "Cylinder Head",
-    "IZK 047": "Cylinder Head", "IZK 048": "Cylinder Head", "IZK 049": "Cylinder Head",
-    "KARAKURI PARALEL A": "Cylinder Head", "LASER MARKING": "Cylinder Head",
-
-    # Crank Shaft
+    "LASER MARKING CB": "Cylinder Block", "COBOT": "Cylinder Head", "DAISHA": "Cylinder Head",
+    "IAT 001": "Cylinder Head", "IAT 002": "Cylinder Head", "IAT 003": "Cylinder Head",
+    "IDR 040": "Cylinder Head", "IMI 040": "Cylinder Head", "ISP 005": "Cylinder Head",
+    "ISP 009": "Cylinder Head", "ISP 016": "Cylinder Head", "ISP 018": "Cylinder Head",
+    "ISP 019": "Cylinder Head", "ISP 022": "Cylinder Head", "ISP 023": "Cylinder Head",
+    "ISP 026": "Cylinder Head", "ISP 027": "Cylinder Head", "ISP 028": "Cylinder Head",
+    "ISP 029": "Cylinder Head", "ISP 030": "Cylinder Head", "ISP 031": "Cylinder Head",
+    "ISP 032": "Cylinder Head", "ISP 033": "Cylinder Head", "ISP 034": "Cylinder Head",
+    "ISP 035": "Cylinder Head", "ISP 036": "Cylinder Head", "ISP 037": "Cylinder Head",
+    "ISP 038": "Cylinder Head", "ISP 039": "Cylinder Head", "ISP 040": "Cylinder Head",
+    "ISP 041": "Cylinder Head", "ISP 042": "Cylinder Head", "ISP 043": "Cylinder Head",
+    "ISP 045": "Cylinder Head", "ISP 046": "Cylinder Head", "ISP 047": "Cylinder Head",
+    "ISP 048": "Cylinder Head", "ISP 049": "Cylinder Head", "ISP 050": "Cylinder Head",
+    "ISP 051": "Cylinder Head", "ISP 052": "Cylinder Head", "ISP 053": "Cylinder Head",
+    "ISP 090": "Cylinder Head", "ISP 091": "Cylinder Head", "ISP 093": "Cylinder Head",
+    "ISP 094": "Cylinder Head", "ISP 099": "Cylinder Head", "ISPS 001": "Cylinder Head",
+    "ISPS 002": "Cylinder Head", "ISPS 003": "Cylinder Head", "ISPS 004": "Cylinder Head",
+    "ISPS 005": "Cylinder Head", "ISPS 006": "Cylinder Head", "ISPS 007": "Cylinder Head",
+    "ISPS 008": "Cylinder Head", "ISPS 009": "Cylinder Head", "ISPS 010": "Cylinder Head",
+    "ISPS 011": "Cylinder Head", "ISPS 012": "Cylinder Head", "ISPS 013": "Cylinder Head",
+    "ISPS 014": "Cylinder Head", "ISPS 015": "Cylinder Head", "ISPS 016": "Cylinder Head",
+    "ISPS 017": "Cylinder Head", "ISPS 018": "Cylinder Head", "ISPS 019": "Cylinder Head",
+    "ISPS 020": "Cylinder Head", "ISPS 021": "Cylinder Head", "ISPS 022": "Cylinder Head",
+    "ISPS 023": "Cylinder Head", "ISPS 024": "Cylinder Head", "ISPS 025": "Cylinder Head",
+    "ISPS 026": "Cylinder Head", "ISPS 034": "Cylinder Head", "ISPS 035": "Cylinder Head",
+    "ISPS 049": "Cylinder Head", "ITS 013": "Cylinder Head", "ITS 014": "Cylinder Head",
+    "IWB 022": "Cylinder Head", "IWBS 001": "Cylinder Head", "IZK 044": "Cylinder Head",
+    "IZK 046": "Cylinder Head", "IZK 047": "Cylinder Head", "IZK 048": "Cylinder Head",
+    "IZK 049": "Cylinder Head", "KARAKURI PARALEL A": "Cylinder Head", "LASER MARKING": "Cylinder Head",
     "ITS 017": "Crank Shaft", "ILA 003": "Crank Shaft", "ILA 004": "Crank Shaft",
     "IMI 041": "Crank Shaft", "IZY 018": "Crank Shaft", "ILS 022": "Crank Shaft",
     "IMI 042": "Crank Shaft", "IMI 043": "Crank Shaft", "IZY 019": "Crank Shaft",
@@ -175,40 +196,37 @@ MACHINE_LINE_MAPPING = {
     "ISP 066": "Crank Shaft", "ISP 067": "Crank Shaft", "ISP 060": "Crank Shaft",
     "ISP 068": "Crank Shaft", "ILS 023": "Crank Shaft", "ILA 005": "Crank Shaft"
 }
-
 mesin_list = ["-- Pilih Mesin --"] + sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-# 4. Header Tampilan
-st.markdown("<h3>❌ Input Part NG (not good)</h3>", unsafe_allow_html=True)
-st.markdown("<p style='font-size:14px; margin-top:-10px; color:#666;'>Formulir pelaporan part tidak sesuai standar</p>", unsafe_allow_html=True)
-st.divider()
+# 4. Header UI
+st.markdown('<div class="title-text">❌ Input Part NG (Not Good)</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">Formulir pelaporan part tidak sesuai standar</div>', unsafe_allow_html=True)
 
-# 5. Form Layout
-st.markdown("**📸 Foto name plate part NG**")
-st.markdown("<p style='font-size:12px; margin-top:-10px; color:#666;'>(PNG atau JPG, maks 200MB)</p>", unsafe_allow_html=True)
-uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+# 5. Area Upload Foto
+st.markdown("**📸 Foto Name Plate Part NG**")
+uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], help="Upload foto komponen yang bermasalah (Maks 200MB)")
 
 st.write("")
 
+# 6. Grid Form Input
 col1, col2 = st.columns(2)
 
 with col1:
-    tanggal_temuan = st.date_input("Tanggal temuan", datetime.date.today())
-    nama_teknisi = st.selectbox("Nama teknisi / MP", mp_list)
-    serial_no = st.text_input("Serial No. part", placeholder="Contoh: SN-12345")
+    tanggal_temuan = st.date_input("Tanggal Temuan", datetime.date.today())
+    nama_teknisi = st.selectbox("Nama Teknisi / MP", mp_list)
+    serial_no = st.text_input("Serial No. Part", placeholder="Contoh: SN-12345")
     qty = st.number_input("Qty", min_value=1, value=1, step=1)
 
 with col2:
-    nama_part = st.text_input("Nama part", placeholder="Masukkan nama part")
+    nama_part = st.text_input("Nama Part", placeholder="Masukkan nama part")
     tipe_part = st.text_input("Type", placeholder="Masukkan tipe part")
     nama_mesin = st.selectbox("Mesin", mesin_list)
 
 st.write("")
-st.write("")
 
-# 6. Tombol Simpan Data
+# 7. Tombol Simpan
 if st.button("SIMPAN DATA PART NG"):
-    if nama_teknisi == "-- Pilih --":
+    if nama_teknisi == "-- Pilih MP --":
         st.error("Silakan pilih Nama Teknisi / MP terlebih dahulu.")
     elif nama_mesin == "-- Pilih Mesin --":
         st.error("Silakan pilih Mesin terlebih dahulu.")
