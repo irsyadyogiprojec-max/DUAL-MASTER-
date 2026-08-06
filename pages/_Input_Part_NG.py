@@ -3,14 +3,14 @@ import datetime
 import re
 import requests
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 # 1. Konfigurasi Halaman & Endpoint Google Sheets
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="centered")
 
 SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
 
-# 2. Inisialisasi Session State untuk Auto-Scan TYPE & SERIAL No.
+# 2. Inisialisasi Session State
 if "ng_type" not in st.session_state:
     st.session_state["ng_type"] = ""
 if "ng_sn" not in st.session_state:
@@ -27,7 +27,18 @@ try:
 except ImportError:
     HAS_OCR = False
 
-# 4. Fungsi Auto-Scan OCR dengan Deteksi Multi-Sudut (Rotasi)
+# 4. Fungsi Pre-Processing Gambar agar Teks Lebih Tajam
+def enhance_image_for_ocr(pil_img):
+    # Perbesar resolusi gambar 2x lipat agar detail huruf 'A' dan 'L' tidak samar
+    w, h = pil_img.size
+    img_resized = pil_img.resize((w * 2, h * 2), Image.LANCZOS)
+    
+    # Tingkatkan kontras gambar
+    enhancer = ImageEnhance.Contrast(img_resized)
+    img_contrast = enhancer.enhance(2.0)
+    return img_contrast
+
+# 5. Fungsi Auto-Scan OCR dengan Koreksi Karakter
 def scan_rotated_label(pil_img):
     if not HAS_OCR:
         return "", ""
@@ -35,28 +46,45 @@ def scan_rotated_label(pil_img):
     detected_type = ""
     detected_sn = ""
     
-    # Memindai pada rotasi 0°, 270°, dan 90° karena tulisan name plate sering vertikal
-    angles = [0, 270, 90]
+    # Pertajam & perbesar gambar sebelum OCR
+    enhanced_img = enhance_image_for_ocr(pil_img)
+    
+    # Coba sudut rotasi (0°, 270°, 90°, 180°)
+    angles = [0, 270, 90, 180]
     
     for angle in angles:
-        rotated = pil_img.rotate(angle, expand=True) if angle != 0 else pil_img
+        rotated = enhanced_img.rotate(angle, expand=True) if angle != 0 else enhanced_img
         img_np = np.array(rotated)
         try:
             results = reader.readtext(img_np, detail=0)
-            full_text = " ".join(results)
+            full_text = " ".join(results).upper()
             
-            # Match TYPE (Contoh: TYPE DME-010 / TYPE: DME-010)
+            # Deteksi TYPE (Contoh: DME-010)
             if not detected_type:
-                type_match = re.search(r'TYPE[:\s]*([A-Z0-9-]+)', full_text, re.IGNORECASE)
+                type_match = re.search(r'TYPE[:\s]*([A-Z0-9-]+)', full_text)
                 if type_match:
                     detected_type = type_match.group(1).strip()
-            
-            # Match Serial No (Contoh: SERIAL No. 2CB0421 A / S/N 2CB0421 A)
+                elif "DME" in full_text:
+                    dme_match = re.search(r'(DME-[0-9]+)', full_text)
+                    if dme_match:
+                        detected_type = dme_match.group(1).strip()
+
+            # Deteksi SERIAL No. (Contoh: 2CB0421 A)
             if not detected_sn:
-                sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,15})', full_text, re.IGNORECASE)
+                sn_match = re.search(r'(?:SERIAL\s*NO|SERIAL|S/N|SN)[:.\s]*([A-Z0-9\s]{5,12})', full_text)
                 if sn_match:
-                    detected_sn = sn_match.group(1).strip()
-            
+                    raw_sn = sn_match.group(1).strip()
+                else:
+                    # Pattern matching langsung format kode serial (e.g. 2CB0421 A)
+                    direct_match = re.search(r'([0-9][A-Z0-9]{5,8}\s*[A-Z1L])', full_text)
+                    raw_sn = direct_match.group(1).strip() if direct_match else ""
+
+                if raw_sn:
+                    # KOREKSI OTOMATIS KESALAHAN OCR UMUM:
+                    # Jika berakhiran ' L', ' 1', atau ' I' setelah format angka/huruf serial, ubah ke ' A'
+                    raw_sn = re.sub(r'(\d[A-Z0-9]{5,7}\s+)[L1I]$', r'\1A', raw_sn)
+                    detected_sn = raw_sn
+
             if detected_type and detected_sn:
                 break
         except Exception:
@@ -64,7 +92,7 @@ def scan_rotated_label(pil_img):
             
     return detected_type, detected_sn
 
-# 5. Styling Tampilan Dark Theme
+# 6. Styling Tampilan Dark Theme
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -122,7 +150,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 6. Database MP & Mesin
+# 7. Database MP & Mesin
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -206,11 +234,11 @@ MACHINE_LINE_MAPPING = {
 }
 mesin_list = sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-# 7. Header
+# 8. Header
 st.markdown('<div class="title-text">❌ Input Part NG (Not Good)</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle-text">Formulir pelaporan part tidak sesuai standar</div>', unsafe_allow_html=True)
 
-# 8. Upload Foto & Pemindaian Auto-Scan
+# 9. Upload Foto & Pemindaian Auto-Scan
 uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part NG", type=["png", "jpg", "jpeg"])
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
@@ -224,7 +252,7 @@ if uploaded_file is not None:
 
 st.write("")
 
-# 9. Form Input Utama
+# 10. Form Input Utama
 with st.form("form_ng", clear_on_submit=False):
     col1, col2 = st.columns(2)
     
@@ -235,7 +263,6 @@ with st.form("form_ng", clear_on_submit=False):
         qty = st.number_input("QTY", min_value=1, value=1, step=1)
         
     with col2:
-        # Nama Part dikunci dan tidak bisa diubah
         nama_part = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
         type_part = st.text_input("TYPE", value=st.session_state.get("ng_type", ""), placeholder="Contoh: DME-010")
         no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("ng_sn", ""), placeholder="Contoh: 2CB0421 A")
@@ -253,7 +280,6 @@ with st.form("form_ng", clear_on_submit=False):
             shift = MP_DATA.get(teknisi, "General")
             line = MACHINE_LINE_MAPPING.get(mesin, "Unknown Line")
 
-            # Status otomatis terkirim sebagai "NG"
             payload = {
                 "action": "NG", 
                 "tanggal": str(tanggal), 
