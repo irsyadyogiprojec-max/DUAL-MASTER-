@@ -6,15 +6,15 @@ import re
 from PIL import Image
 
 # 1. Konfigurasi Halaman & Endpoint Google Sheets
-st.set_page_config(page_title="Input Part Install", page_icon="📦", layout="centered")
+st.set_page_config(page_title="Input Part OK", page_icon="✅", layout="centered")
 
 SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
 
 # 2. Inisialisasi Session State
-if "install_type" not in st.session_state:
-    st.session_state["install_type"] = ""
-if "install_sn" not in st.session_state:
-    st.session_state["install_sn"] = ""
+if "ok_type" not in st.session_state:
+    st.session_state["ok_type"] = ""
+if "ok_sn" not in st.session_state:
+    st.session_state["ok_sn"] = ""
 
 # 3. Fungsi OCR via API Cloud (Ringan & Bebas Crash RAM)
 def scan_label_api(pil_img):
@@ -28,7 +28,7 @@ def scan_label_api(pil_img):
         payload = {'apikey': 'helloworld', 'language': 'eng', 'OCREngine': 2}
         files = {'filename': ('image.jpg', img_byte_arr.getvalue(), 'image/jpeg')}
         
-        res = requests.post(url, data=payload, files=files, timeout=15).json()
+        res = requests.post(url, data=payload, files=files, timeout=8).json()
         
         if res.get("ParsedResults"):
             text = res["ParsedResults"][0]["ParsedText"].upper()
@@ -50,7 +50,7 @@ def scan_label_api(pil_img):
         
     return "DME-010", "2CB0421 A"
 
-# 4. Styling Tampilan Dark Theme
+# 4. Styling Tampilan Dark Theme (Sama Persis Seperti Part Repair & NG)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
@@ -73,7 +73,7 @@ st.markdown("""
         padding: 10px;
     }
     div.stButton > button {
-        background: linear-gradient(135deg, #1E3A8A 0%, #172554 100%) !important;
+        background: linear-gradient(135deg, #1C4D25 0%, #0F3316 100%) !important;
         color: #FFF !important;
         border: 1px solid #D4AF37 !important;
         font-weight: 700 !important;
@@ -84,7 +84,7 @@ st.markdown("""
         margin-top: 15px;
     }
     div.stButton > button:hover {
-        background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
+        background: linear-gradient(135deg, #276933 0%, #174A21 100%) !important;
         border-color: #F3E5AB !important;
     }
     </style>
@@ -175,24 +175,24 @@ MACHINE_LINE_MAPPING = {
 mesin_list = sorted(list(MACHINE_LINE_MAPPING.keys()))
 
 # 6. Header
-st.markdown('<div class="title-text">📦 Input Part Install</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle-text">Formulir pencatatan pemasangan (install) part ke mesin</div>', unsafe_allow_html=True)
+st.markdown('<div class="title-text">✅ Input Part OK</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle-text">Formulir pencatatan part siap pakai / kondisi OK</div>', unsafe_allow_html=True)
 
 # 7. Upload Foto & Auto Scan OCR
-uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part Install", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part OK", type=["png", "jpg", "jpeg"])
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
     st.image(image, width=280)
     
     with st.spinner("🔍 Memindai TYPE & SERIAL No..."):
         d_type, d_sn = scan_label_api(image)
-        st.session_state["install_type"] = d_type
-        st.session_state["install_sn"] = d_sn
+        st.session_state["ok_type"] = d_type
+        st.session_state["ok_sn"] = d_sn
 
 st.write("")
 
-# 8. Form Utama (2 Kolom Persis Seperti Repair & OK)
-with st.form("form_install", clear_on_submit=False):
+# 8. Form Utama (2 Kolom Persis Seperti Repair)
+with st.form("form_ok", clear_on_submit=False):
     col1, col2 = st.columns(2)
     
     with col1:
@@ -203,10 +203,10 @@ with st.form("form_install", clear_on_submit=False):
         
     with col2:
         nama_part = st.text_input("Nama Part", value="Dual Master Expander Device", disabled=True)
-        type_part = st.text_input("TYPE", value=st.session_state.get("install_type", ""), placeholder="Contoh: DME-010")
-        no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("install_sn", ""), placeholder="Contoh: 2CB0421 A")
+        type_part = st.text_input("TYPE", value=st.session_state.get("ok_type", ""), placeholder="Contoh: DME-010")
+        no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("ok_sn", ""), placeholder="Contoh: 2CB0421 A")
 
-    submitted = st.form_submit_button("📦 Simpan Data Part Install")
+    submitted = st.form_submit_button("✅ Simpan Data Part OK")
 
     if submitted:
         if teknisi == "-- Pilih MP --":
@@ -220,7 +220,7 @@ with st.form("form_install", clear_on_submit=False):
             line = MACHINE_LINE_MAPPING.get(mesin, "Unknown Line")
 
             payload = {
-                "action": "Install", 
+                "action": "OK", 
                 "tanggal": str(tanggal), 
                 "nama": teknisi, 
                 "shift": shift,
@@ -230,19 +230,16 @@ with st.form("form_install", clear_on_submit=False):
                 "type_part": type_part,
                 "no_seri": no_seri, 
                 "qty": int(qty), 
-                "status": "Install"
+                "status": "OK"
             }
             
             with st.spinner("⏳ Mengirim data ke Google Spreadsheet..."):
                 try:
-                    # Timeout ditingkatkan menjadi 30 detik untuk menghindari Read Timeout
-                    res = requests.post(SHEETS_URL, json=payload, timeout=30)
-                    st.success(f"Berhasil! Data Pemasangan (Install) tersimpan di Spreadsheet (Line: {line})")
+                    res = requests.post(SHEETS_URL, json=payload, timeout=10)
+                    st.success(f"Berhasil! Data Part OK tersimpan di Spreadsheet (Line: {line})")
                     st.balloons()
                     
-                    st.session_state["install_type"] = ""
-                    st.session_state["install_sn"] = ""
-                except requests.exceptions.Timeout:
-                    st.warning("⚠️ Permintaan memakan waktu terlalu lama. Silakan periksa Google Sheet Anda (data mungkin sudah masuk) atau coba klik 'Simpan' sekali lagi.")
+                    st.session_state["ok_type"] = ""
+                    st.session_state["ok_sn"] = ""
                 except Exception as err:
                     st.error(f"Gagal koneksi ke Sheets: {err}")
