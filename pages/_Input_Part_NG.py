@@ -4,29 +4,29 @@ from PIL import Image
 import requests
 import json
 
-# Konfigurasi Halaman
+# 1. Konfigurasi Halaman
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
 
-# --- CSS Styling untuk Tema Mewah Marun & Gold ---
+# 2. CSS Styling (Tema Mewah Marun & Gold Glassmorphism)
 st.markdown("""
     <style>
-    /* Background Utama Putih */
+    /* Background Utama */
     .stApp {
         background-color: #FFFFFF;
     }
     
-    /* Judul Utama - Marun */
+    /* Judul Utama */
     h1, h2, h3 {
         color: #5A1827 !important;
         font-weight: 600;
     }
     
-    /* Label Teks - Abu-abu Gelap */
+    /* Label Teks */
     p, label, .stMarkdown {
         color: #333333 !important;
     }
 
-    /* --- Styling Kotak Input (Dark Mode inside White) --- */
+    /* Styling Input Field Dark Mode */
     div.stTextInput > div > div > input, 
     div.stDateInput > div > div > input,
     div.stNumberInput > div > div > input {
@@ -37,6 +37,7 @@ st.markdown("""
         font-family: monospace;
     }
     
+    /* Styling Dropdown */
     div.stSelectbox > div > div > div {
         background-color: #262626 !important;
         color: #FFFFFF !important;
@@ -50,7 +51,7 @@ st.markdown("""
 
     ::placeholder { color: #AAAAAA !important; }
 
-    /* --- Styling Area Upload File --- */
+    /* Area Upload File */
     div.stFileUploader {
         background-color: #FDFDFD;
         border: 1px solid #E0E0E0;
@@ -64,7 +65,7 @@ st.markdown("""
         border: none;
     }
 
-    /* --- Styling Tombol Simpan Utama --- */
+    /* Tombol Simpan Utama */
     .stButton>button {
         background-color: #5A1827 !important;
         color: #F3E5AB !important;
@@ -72,7 +73,7 @@ st.markdown("""
         border-radius: 4px;
         width: 100%;
         font-weight: bold;
-        padding: 10px;
+        padding: 12px;
         font-size: 16px;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -85,8 +86,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-
-# --- Database MP (Teknisi) ---
+# 3. Database Data
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -99,8 +99,9 @@ MP_DATA = {
 }
 mp_list = ["-- Pilih --"] + list(MP_DATA.keys())
 
-# --- Database Mesin & Line Lengkap (SUDAH DITUTUP DENGAN BENAR) ---
+# Database Mapping Mesin Ke Line (Lengkap & Sintaks Terpasang Sempurna)
 MACHINE_LINE_MAPPING = {
+    # Cylinder Block
     "IDR 052": "Cylinder Block", "Gondola": "Cylinder Block", "GRAFIR CR.SIZE": "Cylinder Block",
     "IAM 008": "Cylinder Block", "IAT 033": "Cylinder Block", "IAT 034": "Cylinder Block",
     "IBR 018": "Cylinder Block", "IBR 019": "Cylinder Block", "IBR 022": "Cylinder Block",
@@ -131,35 +132,40 @@ MACHINE_LINE_MAPPING = {
     "ITP 004": "Cylinder Block", "ITS 005": "Cylinder Block", "ITS 015": "Cylinder Block",
     "ITS 016": "Cylinder Block", "ITS 033": "Cylinder Block", "IWB 026": "Cylinder Block",
     "IWB 032": "Cylinder Block", "IWB 033": "Cylinder Block", "Junbiki": "Cylinder Block",
-    "LASER MARKING CB": "Cylinder Block", "COBOT": "Cylinder Head", "DAISHA": "Cylinder Head",
-    "IAT 001": "Cylinder Head", "IAT 002": "Cylinder Head", "IAT 003": "Cylinder Head",
-    "IDR 040": "Cylinder Head", "IMI 040": "Cylinder Head", "ISP 005": "Cylinder Head",
-    "ISP 009": "Cylinder Head", "ISP 016": "Cylinder Head", "ISP 018": "Cylinder Head",
-    "ISP 019": "Cylinder Head", "ISP 022": "Cylinder Head", "ISP 023": "Cylinder Head",
-    "ISP 026": "Cylinder Head", "ISP 027": "Cylinder Head", "ISP 028": "Cylinder Head",
-    "ISP 029": "Cylinder Head", "ISP 030": "Cylinder Head", "ISP 031": "Cylinder Head",
-    "ISP 032": "Cylinder Head", "ISP 033": "Cylinder Head", "ISP 034": "Cylinder Head",
-    "ISP 035": "Cylinder Head", "ISP 036": "Cylinder Head", "ISP 037": "Cylinder Head",
-    "ISP 038": "Cylinder Head", "ISP 039": "Cylinder Head", "ISP 040": "Cylinder Head",
-    "ISP 041": "Cylinder Head", "ISP 042": "Cylinder Head", "ISP 043": "Cylinder Head",
-    "ISP 045": "Cylinder Head", "ISP 046": "Cylinder Head", "ISP 047": "Cylinder Head",
-    "ISP 048": "Cylinder Head", "ISP 049": "Cylinder Head", "ISP 050": "Cylinder Head",
-    "ISP 051": "Cylinder Head", "ISP 052": "Cylinder Head", "ISP 053": "Cylinder Head",
-    "ISP 090": "Cylinder Head", "ISP 091": "Cylinder Head", "ISP 093": "Cylinder Head",
-    "ISP 094": "Cylinder Head", "ISP 099": "Cylinder Head", "ISPS 001": "Cylinder Head",
-    "ISPS 002": "Cylinder Head", "ISPS 003": "Cylinder Head", "ISPS 004": "Cylinder Head",
-    "ISPS 005": "Cylinder Head", "ISPS 006": "Cylinder Head", "ISPS 007": "Cylinder Head",
-    "ISPS 008": "Cylinder Head", "ISPS 009": "Cylinder Head", "ISPS 010": "Cylinder Head",
-    "ISPS 011": "Cylinder Head", "ISPS 012": "Cylinder Head", "ISPS 013": "Cylinder Head",
-    "ISPS 014": "Cylinder Head", "ISPS 015": "Cylinder Head", "ISPS 016": "Cylinder Head",
-    "ISPS 017": "Cylinder Head", "ISPS 018": "Cylinder Head", "ISPS 019": "Cylinder Head",
-    "ISPS 020": "Cylinder Head", "ISPS 021": "Cylinder Head", "ISPS 022": "Cylinder Head",
-    "ISPS 023": "Cylinder Head", "ISPS 024": "Cylinder Head", "ISPS 025": "Cylinder Head",
-    "ISPS 026": "Cylinder Head", "ISPS 034": "Cylinder Head", "ISPS 035": "Cylinder Head",
-    "ISPS 049": "Cylinder Head", "ITS 013": "Cylinder Head", "ITS 014": "Cylinder Head",
-    "IWB 022": "Cylinder Head", "IWBS 001": "Cylinder Head", "IZK 044": "Cylinder Head",
-    "IZK 046": "Cylinder Head", "IZK 047": "Cylinder Head", "IZK 048": "Cylinder Head",
-    "IZK 049": "Cylinder Head", "KARAKURI PARALEL A": "Cylinder Head", "LASER MARKING": "Cylinder Head",
+    "LASER MARKING CB": "Cylinder Block",
+
+    # Cylinder Head
+    "COBOT": "Cylinder Head", "DAISHA": "Cylinder Head", "IAT 001": "Cylinder Head",
+    "IAT 002": "Cylinder Head", "IAT 003": "Cylinder Head", "IDR 040": "Cylinder Head",
+    "IMI 040": "Cylinder Head", "ISP 005": "Cylinder Head", "ISP 009": "Cylinder Head",
+    "ISP 016": "Cylinder Head", "ISP 018": "Cylinder Head", "ISP 019": "Cylinder Head",
+    "ISP 022": "Cylinder Head", "ISP 023": "Cylinder Head", "ISP 026": "Cylinder Head",
+    "ISP 027": "Cylinder Head", "ISP 028": "Cylinder Head", "ISP 029": "Cylinder Head",
+    "ISP 030": "Cylinder Head", "ISP 031": "Cylinder Head", "ISP 032": "Cylinder Head",
+    "ISP 033": "Cylinder Head", "ISP 034": "Cylinder Head", "ISP 035": "Cylinder Head",
+    "ISP 036": "Cylinder Head", "ISP 037": "Cylinder Head", "ISP 038": "Cylinder Head",
+    "ISP 039": "Cylinder Head", "ISP 040": "Cylinder Head", "ISP 041": "Cylinder Head",
+    "ISP 042": "Cylinder Head", "ISP 043": "Cylinder Head", "ISP 045": "Cylinder Head",
+    "ISP 046": "Cylinder Head", "ISP 047": "Cylinder Head", "ISP 048": "Cylinder Head",
+    "ISP 049": "Cylinder Head", "ISP 050": "Cylinder Head", "ISP 051": "Cylinder Head",
+    "ISP 052": "Cylinder Head", "ISP 053": "Cylinder Head", "ISP 090": "Cylinder Head",
+    "ISP 091": "Cylinder Head", "ISP 093": "Cylinder Head", "ISP 094": "Cylinder Head",
+    "ISP 099": "Cylinder Head", "ISPS 001": "Cylinder Head", "ISPS 002": "Cylinder Head",
+    "ISPS 003": "Cylinder Head", "ISPS 004": "Cylinder Head", "ISPS 005": "Cylinder Head",
+    "ISPS 006": "Cylinder Head", "ISPS 007": "Cylinder Head", "ISPS 008": "Cylinder Head",
+    "ISPS 009": "Cylinder Head", "ISPS 010": "Cylinder Head", "ISPS 011": "Cylinder Head",
+    "ISPS 012": "Cylinder Head", "ISPS 013": "Cylinder Head", "ISPS 014": "Cylinder Head",
+    "ISPS 015": "Cylinder Head", "ISPS 016": "Cylinder Head", "ISPS 017": "Cylinder Head",
+    "ISPS 018": "Cylinder Head", "ISPS 019": "Cylinder Head", "ISPS 020": "Cylinder Head",
+    "ISPS 021": "Cylinder Head", "ISPS 022": "Cylinder Head", "ISPS 023": "Cylinder Head",
+    "ISPS 024": "Cylinder Head", "ISPS 025": "Cylinder Head", "ISPS 026": "Cylinder Head",
+    "ISPS 034": "Cylinder Head", "ISPS 035": "Cylinder Head", "ISPS 049": "Cylinder Head",
+    "ITS 013": "Cylinder Head", "ITS 014": "Cylinder Head", "IWB 022": "Cylinder Head",
+    "IWBS 001": "Cylinder Head", "IZK 044": "Cylinder Head", "IZK 046": "Cylinder Head",
+    "IZK 047": "Cylinder Head", "IZK 048": "Cylinder Head", "IZK 049": "Cylinder Head",
+    "KARAKURI PARALEL A": "Cylinder Head", "LASER MARKING": "Cylinder Head",
+
+    # Crank Shaft
     "ITS 017": "Crank Shaft", "ILA 003": "Crank Shaft", "ILA 004": "Crank Shaft",
     "IMI 041": "Crank Shaft", "IZY 018": "Crank Shaft", "ILS 022": "Crank Shaft",
     "IMI 042": "Crank Shaft", "IMI 043": "Crank Shaft", "IZY 019": "Crank Shaft",
@@ -170,49 +176,45 @@ MACHINE_LINE_MAPPING = {
     "ISP 068": "Crank Shaft", "ILS 023": "Crank Shaft", "ILA 005": "Crank Shaft"
 }
 
-mesin_list = ["-- Pilih Mesin --"] + list(MACHINE_LINE_MAPPING.keys())
+mesin_list = ["-- Pilih Mesin --"] + sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-
-# --- HEADER ---
+# 4. Header Tampilan
 st.markdown("<h3>❌ Input Part NG (not good)</h3>", unsafe_allow_html=True)
 st.markdown("<p style='font-size:14px; margin-top:-10px; color:#666;'>Formulir pelaporan part tidak sesuai standar</p>", unsafe_allow_html=True)
 st.divider()
 
-# --- FORM UI ---
-with st.container():
-    # Upload Foto Name Plate
-    st.markdown("**📸 Foto name plate part NG**")
-    st.markdown("<p style='font-size:12px; margin-top:-10px; color:#666;'>(PNG atau JPG, maks 200MB)</p>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-    
-    st.write("") # Spacer
+# 5. Form Layout
+st.markdown("**📸 Foto name plate part NG**")
+st.markdown("<p style='font-size:12px; margin-top:-10px; color:#666;'>(PNG atau JPG, maks 200MB)</p>", unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
 
-    col1, col2 = st.columns(2)
+st.write("")
 
-    with col1:
-        tanggal_temuan = st.date_input("Tanggal temuan", datetime.date.today())
-        nama_teknisi = st.selectbox("Nama teknisi / MP", mp_list)
-        serial_no = st.text_input("Serial No. part", placeholder="Contoh: SN-12345")
-        qty = st.number_input("Qty", min_value=1, value=1, step=1)
+col1, col2 = st.columns(2)
 
-    with col2:
-        nama_part = st.text_input("Nama part", placeholder="Masukkan nama part")
-        tipe_part = st.text_input("Type", placeholder="Masukkan tipe part")
-        nama_mesin = st.selectbox("Mesin", mesin_list)
+with col1:
+    tanggal_temuan = st.date_input("Tanggal temuan", datetime.date.today())
+    nama_teknisi = st.selectbox("Nama teknisi / MP", mp_list)
+    serial_no = st.text_input("Serial No. part", placeholder="Contoh: SN-12345")
+    qty = st.number_input("Qty", min_value=1, value=1, step=1)
 
-    st.write("") # Spacer
-    st.write("") # Spacer
+with col2:
+    nama_part = st.text_input("Nama part", placeholder="Masukkan nama part")
+    tipe_part = st.text_input("Type", placeholder="Masukkan tipe part")
+    nama_mesin = st.selectbox("Mesin", mesin_list)
 
-    # Tombol Simpan
-    if st.button("SIMPAN DATA PART NG"):
-        # Validasi Form
-        if nama_teknisi == "-- Pilih --":
-            st.error("Silakan pilih Nama Teknisi / MP terlebih dahulu.")
-        elif nama_mesin == "-- Pilih Mesin --":
-            st.error("Silakan pilih Mesin terlebih dahulu.")
-        elif not nama_part or not serial_no:
-            st.error("Harap isi Nama Part dan Serial No.")
-        else:
-            line_mesin = MACHINE_LINE_MAPPING.get(nama_mesin, "Unknown Line")
-            st.success(f"✅ Data berhasil disimpan untuk Line: {line_mesin}")
-            st.balloons()
+st.write("")
+st.write("")
+
+# 6. Tombol Simpan Data
+if st.button("SIMPAN DATA PART NG"):
+    if nama_teknisi == "-- Pilih --":
+        st.error("Silakan pilih Nama Teknisi / MP terlebih dahulu.")
+    elif nama_mesin == "-- Pilih Mesin --":
+        st.error("Silakan pilih Mesin terlebih dahulu.")
+    elif not nama_part or not serial_no:
+        st.error("Harap isi Nama Part dan Serial No.")
+    else:
+        line_mesin = MACHINE_LINE_MAPPING.get(nama_mesin, "Unknown Line")
+        st.success(f"✅ Data berhasil disimpan untuk Line: {line_mesin}")
+        st.balloons()
