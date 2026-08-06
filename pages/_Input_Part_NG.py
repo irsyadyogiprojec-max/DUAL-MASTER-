@@ -1,36 +1,50 @@
 import streamlit as st
 import datetime
-from PIL import Image
+import re
 import requests
-import json
+import numpy as np
+from PIL import Image
 
-# 1. Konfigurasi Halaman (Menggunakan 'centered' agar tidak merenggang terlalu lebar)
+# 1. Konfigurasi Halaman & Endpoint Google Sheets dari Kodingan Lama
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="centered")
 
-# 2. CSS Custom Theme Luxury Dark & Glassmorphism
+SHEETS_URL = "https://script.google.com/macros/s/AKfycbxsUPF4TJ-IWd6N2vam8mBAwcuzqG0lOcSuVu5PCW2TkCZeKGqMhO5GixLCsw6oOmQX/exec"
+
+# 2. Inisialisasi State OCR
+if "ng_type" not in st.session_state: 
+    st.session_state["ng_type"] = ""
+if "ng_sn" not in st.session_state: 
+    st.session_state["ng_sn"] = ""
+if "ng_name" not in st.session_state:
+    st.session_state["ng_name"] = ""
+
+# 3. OCR Engine Setup (EasyOCR dengan fallback)
+try:
+    import easyocr
+    @st.cache_resource
+    def load_ocr_reader():
+        return easyocr.Reader(['en'], gpu=False)
+    reader = load_ocr_reader()
+    HAS_OCR = True
+except ImportError:
+    HAS_OCR = False
+
+# 4. Custom Dark CSS
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
-    /* Font Global */
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', sans-serif;
     }
-
-    /* Background Utama Dark Luxury Gradient */
     .stApp {
         background: linear-gradient(135deg, #0F1015 0%, #171922 100%);
         color: #E2E8F0;
     }
-
-    /* Membatasi lebar kontainer agar rapi di tengah */
     .block-container {
         max-width: 800px !important;
-        padding-top: 2.5rem;
+        padding-top: 2rem;
         padding-bottom: 3rem;
     }
-
-    /* Judul Utama */
     .title-text {
         color: #F3E5AB;
         font-size: 26px;
@@ -42,79 +56,38 @@ st.markdown("""
         font-size: 14px;
         margin-bottom: 20px;
     }
-
-    /* Label Input */
     label {
         color: #CBD5E1 !important;
         font-weight: 500 !important;
         font-size: 14px !important;
-        margin-bottom: 6px !important;
     }
-
-    /* Styling Kotak Input & Dropdown */
-    div[data-baseweb="input"], 
-    div[data-baseweb="select"] > div {
+    div[data-baseweb="input"], div[data-baseweb="select"] > div {
         background-color: #1E2230 !important;
         border: 1px solid #333A4E !important;
         border-radius: 8px !important;
         color: #FFFFFF !important;
     }
-
-    div[data-baseweb="input"]:focus-within, 
-    div[data-baseweb="select"]:focus-within {
-        border-color: #D4AF37 !important;
-        box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
-    }
-
-    /* Teks dalam Input & Dropdown */
-    input {
-        color: #FFFFFF !important;
-    }
-    
-    div[data-baseweb="select"] * {
-        color: #FFFFFF !important;
-        background-color: #1E2230 !important;
-    }
-
-    /* File Uploader Styling */
     div[data-testid="stFileUploader"] {
         background-color: #1E2230;
         border: 1.5px dashed #D4AF37;
         border-radius: 10px;
-        padding: 12px;
+        padding: 10px;
     }
-
-    div[data-testid="stFileUploader"] section {
-        background-color: transparent !important;
-    }
-
-    /* Tombol Simpan Mewah (Marun + Emas Glow) */
     div.stButton > button {
         background: linear-gradient(135deg, #8B1E37 0%, #5B1021 100%) !important;
         color: #FFF !important;
         border: 1px solid #D4AF37 !important;
         font-weight: 700 !important;
         font-size: 16px !important;
-        padding: 14px 28px !important;
+        padding: 12px 28px !important;
         border-radius: 8px !important;
         width: 100% !important;
-        box-shadow: 0 4px 15px rgba(139, 30, 55, 0.5);
-        transition: all 0.3s ease !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
         margin-top: 15px;
-    }
-
-    div.stButton > button:hover {
-        background: linear-gradient(135deg, #A82544 0%, #75152B 100%) !important;
-        color: #F3E5AB !important;
-        box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
-        transform: translateY(-2px);
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Database Data
+# 5. Master Data (MP & Mesin Mapping)
 MP_DATA = {
     "Ammar": "Red", "Agus M": "Red", "Irul K": "White", "Apriansyah": "Red",
     "M. Safiq": "General", "Eko P": "White", "Arif B": "Red", "Jaenal": "White",
@@ -125,7 +98,7 @@ MP_DATA = {
     "M Derajat": "White", "Deni P": "Staff", "Mamun": "Staff", "Wahyu R": "Staff",
     "Rizky": "Staff", "Rain B": "White", "Irsyad": "White", "Ryan F": "Staff", "Asep": "Red"
 }
-mp_list = ["-- Pilih MP --"] + sorted(list(MP_DATA.keys()))
+mp_list = sorted(list(MP_DATA.keys()))
 
 MACHINE_LINE_MAPPING = {
     "IDR 052": "Cylinder Block", "Gondola": "Cylinder Block", "GRAFIR CR.SIZE": "Cylinder Block",
@@ -196,43 +169,97 @@ MACHINE_LINE_MAPPING = {
     "ISP 066": "Crank Shaft", "ISP 067": "Crank Shaft", "ISP 060": "Crank Shaft",
     "ISP 068": "Crank Shaft", "ILS 023": "Crank Shaft", "ILA 005": "Crank Shaft"
 }
-mesin_list = ["-- Pilih Mesin --"] + sorted(list(MACHINE_LINE_MAPPING.keys()))
+mesin_list = sorted(list(MACHINE_LINE_MAPPING.keys()))
 
-# 4. Header UI
+# 6. Header
 st.markdown('<div class="title-text">❌ Input Part NG (Not Good)</div>', unsafe_allow_html=True)
 st.markdown('<div class="subtitle-text">Formulir pelaporan part tidak sesuai standar</div>', unsafe_allow_html=True)
 
-# 5. Area Upload Foto
-st.markdown("**📸 Foto Name Plate Part NG**")
-uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], help="Upload foto komponen yang bermasalah (Maks 200MB)")
+# 7. File Upload & Process OCR
+uploaded_file = st.file_uploader("📷 Upload Foto Name Plate Part NG", type=["png", "jpg", "jpeg"])
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, width=300)
+    
+    if HAS_OCR:
+        with st.spinner("🔍 Memindai teks dari foto..."):
+            try:
+                image_np = np.array(image)
+                results = reader.readtext(image_np, detail=0)
+                detected_type, detected_sn, detected_name = "", "", ""
+                
+                for i, text in enumerate(results):
+                    t_upper = text.upper()
+                    if "TYPE" in t_upper or "MODEL" in t_upper:
+                        if ":" in t_upper: detected_type = t_upper.split(":")[1].strip()
+                        elif i + 1 < len(results): detected_type = results[i+1].strip()
+                    if "SERIAL" in t_upper or "S/N" in t_upper or "SER" in t_upper:
+                        if ":" in t_upper: detected_sn = t_upper.split(":")[1].strip()
+                        elif i + 1 < len(results): detected_sn = results[i+1].strip()
+                    if "NAME" in t_upper or "PART" in t_upper:
+                        if ":" in t_upper: detected_name = t_upper.split(":")[1].strip()
+
+                if detected_type: st.session_state["ng_type"] = detected_type
+                if detected_sn: st.session_state["ng_sn"] = detected_sn
+                if detected_name: st.session_state["ng_name"] = detected_name
+            except Exception:
+                pass
 
 st.write("")
 
-# 6. Grid Form Input
-col1, col2 = st.columns(2)
+# 8. Form Utama
+with st.form("form_ng", clear_on_submit=False):
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        tanggal = st.date_input("Tanggal Temuan", value=datetime.date.today())
+        teknisi = st.selectbox("Nama Teknisi / MP", ["-- Pilih MP --"] + mp_list)
+        mesin = st.selectbox("Mesin", ["-- Pilih Mesin --"] + mesin_list)
+        status_aksi = st.radio("Status NG:", ["Pending Analisa", "Scrap / Reject"])
+        
+    with col2:
+        nama_part = st.text_input("Nama Part", value=st.session_state.get("ng_name", ""), placeholder="Masukkan nama part")
+        type_part = st.text_input("TYPE", value=st.session_state.get("ng_type", ""), placeholder="Masukkan tipe part")
+        no_seri = st.text_input("SERIAL No. Part", value=st.session_state.get("ng_sn", ""), placeholder="Contoh: SN-12345")
+        qty = st.number_input("QTY", min_value=1, value=1, step=1)
 
-with col1:
-    tanggal_temuan = st.date_input("Tanggal Temuan", datetime.date.today())
-    nama_teknisi = st.selectbox("Nama Teknisi / MP", mp_list)
-    serial_no = st.text_input("Serial No. Part", placeholder="Contoh: SN-12345")
-    qty = st.number_input("Qty", min_value=1, value=1, step=1)
+    submitted = st.form_submit_button("💾 Simpan Data Part NG")
 
-with col2:
-    nama_part = st.text_input("Nama Part", placeholder="Masukkan nama part")
-    tipe_part = st.text_input("Type", placeholder="Masukkan tipe part")
-    nama_mesin = st.selectbox("Mesin", mesin_list)
+    if submitted:
+        if teknisi == "-- Pilih MP --":
+            st.error("Nama Teknisi wajib dipilih!")
+        elif mesin == "-- Pilih Mesin --":
+            st.error("Mesin wajib dipilih!")
+        elif not nama_part or not no_seri:
+            st.error("Nama Part dan Serial No. wajib diisi!")
+        else:
+            shift = MP_DATA.get(teknisi, "General")
+            line = MACHINE_LINE_MAPPING.get(mesin, "Unknown Line")
 
-st.write("")
-
-# 7. Tombol Simpan
-if st.button("SIMPAN DATA PART NG"):
-    if nama_teknisi == "-- Pilih MP --":
-        st.error("Silakan pilih Nama Teknisi / MP terlebih dahulu.")
-    elif nama_mesin == "-- Pilih Mesin --":
-        st.error("Silakan pilih Mesin terlebih dahulu.")
-    elif not nama_part or not serial_no:
-        st.error("Harap isi Nama Part dan Serial No.")
-    else:
-        line_mesin = MACHINE_LINE_MAPPING.get(nama_mesin, "Unknown Line")
-        st.success(f"✅ Data berhasil disimpan untuk Line: {line_mesin}")
-        st.balloons()
+            # Payload persis seperti skema Google Apps Script lama Anda
+            payload = {
+                "action": "NG", 
+                "tanggal": str(tanggal), 
+                "nama": teknisi, 
+                "shift": shift,
+                "line": line, 
+                "mesin": mesin, 
+                "nama_part": nama_part, 
+                "type_part": type_part,
+                "no_seri": no_seri, 
+                "qty": int(qty), 
+                "status": status_aksi
+            }
+            
+            with st.spinner("⏳ Mengirim data ke Spreadsheet..."):
+                try:
+                    res = requests.post(SHEETS_URL, json=payload, timeout=10)
+                    st.success(f"Input Berhasil! Data tersimpan di Line: {line}")
+                    st.balloons()
+                    
+                    # Reset state setelah sukses
+                    st.session_state["ng_type"] = ""
+                    st.session_state["ng_sn"] = ""
+                    st.session_state["ng_name"] = ""
+                except Exception as err:
+                    st.error(f"Gagal koneksi ke Sheets: {err}")
