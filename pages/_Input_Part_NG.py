@@ -18,60 +18,152 @@ except ImportError:
 
 st.set_page_config(page_title="Input Part NG", page_icon="❌", layout="wide")
 
-# CSS Styling untuk tema Putih bersih + Kotak Form Gelap + Aksen Marun & Gold Mewah
+# ============================================================
+# CSS Styling — Tema Putih Bersih + Aksen Marun & Gold (Mewah)
+# ============================================================
 st.markdown("""
     <style>
+    /* Import font yang lebih halus */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Poppins', sans-serif;
+    }
+
     /* Background utama putih bersih */
     .stApp {
         background-color: #FFFFFF;
     }
-    
-    /* Judul dan teks */
+
+    /* Sembunyikan menu bawaan Streamlit agar lebih rapi */
+    #MainMenu, footer {visibility: hidden;}
+
+    /* Header kustom: badge ikon + judul + subjudul */
+    .ng-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 2px solid #7A1F2B;
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+    }
+    .ng-header .ng-icon {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        border-radius: 10px;
+        background-color: #7A1F2B;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #F3D98B;
+    }
+    .ng-header .ng-title {
+        margin: 0;
+        color: #3A1015;
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+    .ng-header .ng-subtitle {
+        margin: 2px 0 0 0;
+        color: #8A6A2F;
+        font-size: 13px;
+    }
+
+    /* Judul dan teks umum */
     h1, h2, h3 {
-        color: #6b1d2f !important;
+        color: #3A1015 !important;
     }
-    p, label, .stMarkdown {
-        color: #2C2C2C !important;
+    p, label, .stMarkdown, .stMarkdown p {
+        color: #5A3A20 !important;
     }
-    
+
+    /* Label field (judul di atas setiap input) */
+    div[data-testid="stWidgetLabel"] label p {
+        font-weight: 500 !important;
+        font-size: 13px !important;
+        color: #5A3A20 !important;
+    }
+
     /* Garis pembatas warna marun */
     hr {
-        border-color: #6b1d2f !important;
+        border-color: #E8D9B5 !important;
     }
 
-    /* Kotak Upload File mirip kartu */
+    /* Kotak Upload File bergaya kartu krem lembut */
     [data-testid="stFileUploader"] {
-        background-color: #FDFBF7;
-        border: 1px solid #E6DCC3;
-        border-radius: 8px;
-        padding: 15px;
+        background-color: #FDFBF6;
+        border: 1px solid #E8D9B5;
+        border-radius: 10px;
+        padding: 16px;
+    }
+    [data-testid="stFileUploader"] section {
+        background-color: transparent;
+    }
+    [data-testid="stFileUploaderDropzone"] button {
+        background-color: #7A1F2B !important;
+        color: #F3D98B !important;
+        border: 1px solid #7A1F2B !important;
+        border-radius: 6px !important;
+        font-weight: 500 !important;
     }
 
-    /* Input/Selectbox kotak menjadi gelap (menyesuaikan referensi) */
-    div.stTextInput > div > div > input, 
-    div.stSelectbox > div > div > div, 
+    /* Input / Selectbox / Dateinput / Numberinput — kotak terang krem */
+    div.stTextInput > div > div > input,
+    div.stSelectbox > div > div > div,
     div.stDateInput > div > div > input,
     div.stNumberInput > div > div > input {
-        background-color: #2A2A2A !important;
-        color: #FFFFFF !important;
-        border-radius: 6px;
-        border: 1px solid #444444;
+        background-color: #FDFBF6 !important;
+        color: #3A1015 !important;
+        border-radius: 8px !important;
+        border: 1px solid #E8D9B5 !important;
     }
 
-    /* Tombol Simpan warna Marun mewah dengan teks Gold */
-    .stButton>button {
-        background-color: #6b1d2f;
-        color: #F3E5AB;
-        border: 1px solid #D4AF37;
-        border-radius: 6px;
-        width: 100%;
-        font-weight: bold;
-        padding: 10px;
+    /* Fokus pada input: highlight gold tipis */
+    div.stTextInput > div > div > input:focus,
+    div.stDateInput > div > div > input:focus,
+    div.stNumberInput > div > div > input:focus {
+        border: 1px solid #C9A227 !important;
+        box-shadow: 0 0 0 1px #C9A227 !important;
     }
-    .stButton>button:hover {
+
+    /* Input yang disabled (Nama Part) tetap terlihat rapi */
+    div.stTextInput > div > div > input:disabled {
+        background-color: #F5F0E4 !important;
+        color: #9A8A6A !important;
+    }
+
+    /* Tombol Simpan — Marun mewah dengan teks & border Gold */
+    .stButton>button, div[data-testid="stFormSubmitButton"] button {
+        background-color: #7A1F2B;
+        color: #F3D98B;
+        border: 1px solid #C9A227;
+        border-radius: 8px;
+        width: 100%;
+        font-weight: 600;
+        padding: 10px;
+        letter-spacing: 0.3px;
+        transition: all 0.2s ease;
+    }
+    .stButton>button:hover, div[data-testid="stFormSubmitButton"] button:hover {
         background-color: #8c263d;
         color: #FFFFFF;
-        border-color: #FFFFFF;
+        border-color: #F3D98B;
+    }
+
+    /* Form container sedikit dikasih card look */
+    div[data-testid="stForm"] {
+        background-color: #FFFFFF;
+        border: 1px solid #F0E6C8;
+        border-radius: 14px;
+        padding: 24px 28px;
+    }
+
+    /* Alert sukses / error tetap jelas terbaca */
+    div[data-testid="stAlert"] {
+        border-radius: 8px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -196,9 +288,16 @@ MACHINE_LINE_MAPPING = {
 
 machine_list = list(MACHINE_LINE_MAPPING.keys())
 
-st.markdown("### ❌ Input part NG (not good)")
-st.markdown("<p style='color: #666666; margin-top: -15px;'>Formulir pelaporan part tidak sesuai standar</p>", unsafe_allow_html=True)
-st.markdown("---")
+# Header kustom bergaya kartu (badge ikon marun + judul + subjudul)
+st.markdown("""
+    <div class="ng-header">
+        <div class="ng-icon">❌</div>
+        <div>
+            <p class="ng-title">Input part NG (not good)</p>
+            <p class="ng-subtitle">Formulir pelaporan part tidak sesuai standar</p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 if "ng_type" not in st.session_state: st.session_state["ng_type"] = ""
 if "ng_sn" not in st.session_state: st.session_state["ng_sn"] = ""
@@ -250,24 +349,24 @@ with st.form("form_ng", clear_on_submit=True):
             line_terdeteksi = MACHINE_LINE_MAPPING.get(mesin, "-")
 
             payload = {
-                "action": "NG", 
-                "tanggal": str(tanggal), 
-                "nama": teknisi, 
+                "action": "NG",
+                "tanggal": str(tanggal),
+                "nama": teknisi,
                 "shift": shift,
                 "line": line_terdeteksi,  # Otomatis tercatat di spreadsheet
-                "mesin": mesin, 
-                "nama_part": nama_part, 
+                "mesin": mesin,
+                "nama_part": nama_part,
                 "type_part": type_part if type_part else "-",
-                "no_seri": no_seri if no_seri else "-", 
-                "qty": int(qty), 
+                "no_seri": no_seri if no_seri else "-",
+                "qty": int(qty),
                 "status": "NG"
             }
-            
+
             try:
                 requests.post(SHEETS_URL, json=payload)
                 st.success("Data Part NG Berhasil Disimpan!")
             except Exception as err:
                 st.warning(f"Gagal koneksi ke Sheets: {err}")
-                
+
             st.session_state["ng_type"] = ""
             st.session_state["ng_sn"] = ""
